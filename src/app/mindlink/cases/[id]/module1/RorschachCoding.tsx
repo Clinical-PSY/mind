@@ -53,10 +53,11 @@ function TagSelect({ values, options, onChange, maxItems = 6, placeholder = '+ �
       ))}
       {avail.length > 0 && values.length < maxItems && (
         <select
-          className="text-[9px] h-[18px] rounded bg-white/5 text-white/40 outline-none cursor-pointer px-0.5 leading-tight"
+          className="text-[9px] h-[18px] rounded outline-none cursor-pointer px-0.5 leading-tight text-white/60 border border-white/10"
+          style={{ background: '#1e293b' }}
           value="" onChange={e => { if (e.target.value) onChange([...values, e.target.value]); }}>
-          <option value="">{placeholder}</option>
-          {avail.map(o => <option key={o} value={o}>{o}</option>)}
+          <option value="" style={{ background: '#1e293b', color: 'rgba(255,255,255,0.4)' }}>{placeholder}</option>
+          {avail.map(o => <option key={o} value={o} style={{ background: '#1e293b', color: '#fff' }}>{o}</option>)}
         </select>
       )}
     </div>
@@ -95,7 +96,8 @@ export default function RorschachCoding({ onDataChange, initialRawData }: Props)
     setResponses(prev => prev.length === 1 ? prev : prev.filter(r => r.id !== id));
   };
 
-  const sel = 'h-[22px] text-[10px] rounded bg-slate-700/80 text-white border border-white/10 outline-none focus:border-indigo-400 px-0.5';
+  const selStyle = { background: '#1e293b' };
+  const sel = 'h-[22px] text-[10px] rounded text-white border border-white/10 outline-none focus:border-indigo-400 px-0.5';
   const chk = 'w-3.5 h-3.5 rounded accent-indigo-500 cursor-pointer';
 
   return (
@@ -126,23 +128,23 @@ export default function RorschachCoding({ onDataChange, initialRawData }: Props)
 
                   {/* Card */}
                   <td className="px-1 py-1">
-                    <select value={resp.card} onChange={e => updateResp(resp.id, { card: e.target.value })} className={sel}>
-                      <option value="">—</option>
-                      {CARDS.map(c => <option key={c}>{c}</option>)}
+                    <select value={resp.card} onChange={e => updateResp(resp.id, { card: e.target.value })} className={sel} style={selStyle}>
+                      <option value="" style={selStyle}>—</option>
+                      {CARDS.map(c => <option key={c} style={selStyle}>{c}</option>)}
                     </select>
                   </td>
 
                   {/* Location */}
                   <td className="px-1 py-1">
-                    <select value={resp.location} onChange={e => updateResp(resp.id, { location: e.target.value })} className={sel}>
-                      {LOCS.map(l => <option key={l}>{l}</option>)}
+                    <select value={resp.location} onChange={e => updateResp(resp.id, { location: e.target.value })} className={sel} style={selStyle}>
+                      {LOCS.map(l => <option key={l} style={selStyle}>{l}</option>)}
                     </select>
                   </td>
 
                   {/* DQ */}
                   <td className="px-1 py-1">
-                    <select value={resp.dq} onChange={e => updateResp(resp.id, { dq: e.target.value })} className={sel}>
-                      {DQ_LIST.map(d => <option key={d}>{d}</option>)}
+                    <select value={resp.dq} onChange={e => updateResp(resp.id, { dq: e.target.value })} className={sel} style={selStyle}>
+                      {DQ_LIST.map(d => <option key={d} style={selStyle}>{d}</option>)}
                     </select>
                   </td>
 
@@ -158,8 +160,8 @@ export default function RorschachCoding({ onDataChange, initialRawData }: Props)
 
                   {/* FQ */}
                   <td className="px-1 py-1">
-                    <select value={resp.fq} onChange={e => updateResp(resp.id, { fq: e.target.value })} className={sel}>
-                      {FQ_LIST.map(q => <option key={q}>{q}</option>)}
+                    <select value={resp.fq} onChange={e => updateResp(resp.id, { fq: e.target.value })} className={sel} style={selStyle}>
+                      {FQ_LIST.map(q => <option key={q} style={selStyle}>{q}</option>)}
                     </select>
                   </td>
 
@@ -187,9 +189,9 @@ export default function RorschachCoding({ onDataChange, initialRawData }: Props)
 
                   {/* Z */}
                   <td className="px-1 py-1">
-                    <select value={resp.zScore} onChange={e => updateResp(resp.id, { zScore: e.target.value })} className={sel}>
-                      <option value="">—</option>
-                      {Z_TYPES.map(z => <option key={z}>{z}</option>)}
+                    <select value={resp.zScore} onChange={e => updateResp(resp.id, { zScore: e.target.value })} className={sel} style={selStyle}>
+                      <option value="" style={selStyle}>—</option>
+                      {Z_TYPES.map(z => <option key={z} style={selStyle}>{z}</option>)}
                     </select>
                   </td>
 
