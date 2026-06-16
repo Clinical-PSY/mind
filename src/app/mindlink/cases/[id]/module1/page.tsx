@@ -1,8 +1,8 @@
 'use client';
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, use, useCallback } from 'react';
 import Link from 'next/link';
 import { fetchWithAuth } from '@/lib/fetch-with-auth';
-import RorschachForm from './RorschachForm';
+import RorschachCoding from './RorschachCoding';
 
 interface Session {
   id: string; session_num: number; session_date: string;
@@ -148,6 +148,7 @@ export default function Module1({ params }: { params: Promise<{ id: string }> })
     } else if (testCat === '투사검사' && testSub === '로르샤하') {
       test_name = '로르샤하(Rorschach)';
       Object.entries(form.scores).forEach(([k, v]) => { if (v !== '') scores[k] = isNaN(Number(v)) ? v : Number(v); });
+      raw_data = form.raw_data;
     } else if (testCat === '투사검사' && testSub === 'HTP') {
       test_name = 'HTP';
       raw_data = JSON.stringify({ house: form.htp_house, tree: form.htp_tree, person: form.htp_person });
@@ -186,6 +187,10 @@ export default function Module1({ params }: { params: Promise<{ id: string }> })
   function handleScoreChange(k: string, v: string) {
     setForm(f => ({ ...f, scores: { ...f.scores, [k]: v } }));
   }
+
+  const handleRorschachDataChange = useCallback((scores: Record<string, string>, rawData: string) => {
+    setForm(f => ({ ...f, scores, raw_data: rawData }));
+  }, []);
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -339,7 +344,7 @@ export default function Module1({ params }: { params: Promise<{ id: string }> })
       {/* ── 검사 추가 모달 ── */}
       {showAddTest && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
-          <div className={`rounded-2xl p-6 w-full border border-white/10 max-h-[92vh] overflow-y-auto ${testCat === '투사검사' && testSub === '로르샤하' ? 'max-w-4xl' : 'max-w-xl'}`} style={{ background: '#1e293b' }}>
+          <div className={`rounded-2xl p-6 w-full border border-white/10 max-h-[92vh] overflow-y-auto ${testCat === '투사검사' && testSub === '로르샤하' ? 'max-w-5xl' : 'max-w-xl'}`} style={{ background: '#1e293b' }}>
             <div className="flex items-center gap-2 mb-5">
               <span className="text-lg">{catInfo.icon}</span>
               <h2 className="text-white font-bold text-lg">{testCat} 입력
@@ -421,7 +426,10 @@ export default function Module1({ params }: { params: Promise<{ id: string }> })
 
               {/* ── 투사검사 로르샤하 ── */}
               {testCat === '투사검사' && testSub === '로르샤하' && (
-                <RorschachForm scores={form.scores} setScores={handleScoreChange} />
+                <RorschachCoding
+                  onDataChange={handleRorschachDataChange}
+                  initialRawData={form.raw_data}
+                />
               )}
 
               {/* ── 투사검사 HTP ── */}
