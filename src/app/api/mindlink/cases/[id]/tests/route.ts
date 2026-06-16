@@ -17,6 +17,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     test_date: body.test_date ?? new Date().toISOString().slice(0, 10),
     scores: body.scores ?? {},
     interpretation: body.interpretation ?? '',
+    raw_data: body.raw_data ?? '',
+    category: body.category ?? '기타검사',
+    sub_type: body.sub_type ?? '',
   }).select().single();
 
   if (error) return NextResponse.json({ error: '검사 추가 실패' }, { status: 500 });
