@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(node --version)",
+      "PowerShell(npm --version)",
+      "PowerShell(npx --version)",
+      "Read(//c/Users/konyang/Desktop/2026/code/연습/**)",
+      "Read(//c/Users/konyang/Desktop/2026/code/홈페이지/**)",
+      "Read(//c/Users/konyang/Desktop/2026/code/홈페이지/src/app/**)",
+      "PowerShell($env:PATH = \"C:\\\\Program Files\\\\nodejs;$env:PATH\"; Set-Location \"C:\\\\Users\\\\konyang\\\\Desktop\\\\2026\\\\code\\\\홈페이지\"; npm run build 2>&1)",
+      "PowerShell($env:PATH = \"C:\\\\Program Files\\\\nodejs;$env:PATH\"; Set-Location \"C:\\\\Users\\\\konyang\\\\Desktop\\\\2026\\\\code\\\\상담예약\"; npm install 2>&1 | Select-Object -Last 5)",
+      "PowerShell($env:PATH = \"C:\\\\Program Files\\\\nodejs;$env:PATH\"; Set-Location \"C:\\\\Users\\\\konyang\\\\Desktop\\\\2026\\\\code\\\\상담예약\"; npm install 2>&1)",
+      "PowerShell($env:PATH = \"C:\\\\Program Files\\\\nodejs;$env:PATH\"; Set-Location \"C:\\\\Users\\\\konyang\\\\Desktop\\\\2026\\\\code\\\\상담예약\"; npm run build 2>&1)",
+      "PowerShell($env:PATH = \"C:\\\\Program Files\\\\nodejs;$env:PATH\"; Set-Location \"C:\\\\Users\\\\konyang\\\\Desktop\\\\2026\\\\code\\\\상담예약\"; npm run dev 2>&1)",
+      "PowerShell($env:PATH = \"C:\\\\Program Files\\\\nodejs;$env:PATH\"; cd \"C:\\\\Users\\\\konyang\\\\Desktop\\\\2026\\\\code\\\\상담예약\"; npm run build 2>&1)",
+      "PowerShell($env:PATH = \"C:\\\\Program Files\\\\nodejs;$env:PATH\"; cd \"C:\\\\Users\\\\konyang\\\\Desktop\\\\2026\\\\code\\\\상담예약\"; npm install @supabase/supabase-js jose 2>&1)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\konyang\\Desktop\\2026\\code\\홈페이지",
+      "C:\\Users\\konyang\\Desktop\\2026\\code\\��㿹��"
+    ]
+  }
+}
