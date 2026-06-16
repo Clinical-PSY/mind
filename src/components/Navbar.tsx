@@ -81,6 +81,13 @@ export default function Navbar() {
               상담 접수
             </a>
           </li>
+          {authUser && ["admin", "subscriber"].includes(authUser.role) && (
+            <li>
+              <Link href="/mindlink" style={{ ...navLinkStyle, background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", padding: ".38rem 1rem", borderRadius: 6, fontWeight: 700, fontSize: ".82rem" }}>
+                MindLink
+              </Link>
+            </li>
+          )}
           <li>
             {authUser ? (
               <div style={{ display: "flex", alignItems: "center", gap: ".6rem" }}>
@@ -148,6 +155,11 @@ export default function Navbar() {
               <Link href="/dashboard" onClick={() => setMobileOpen(false)} style={{ color: "rgba(255,255,255,.9)", textDecoration: "none", fontSize: "1rem", fontWeight: 600 }}>
                 {authUser.name || authUser.username}님의 마이페이지
               </Link>
+              {["admin", "subscriber"].includes(authUser.role) && (
+                <Link href="/mindlink" onClick={() => setMobileOpen(false)} style={{ color: "#a5b4fc", textDecoration: "none", fontSize: "1rem", fontWeight: 700 }}>
+                  MindLink →
+                </Link>
+              )}
               <button onClick={logout} style={{ background: "none", border: "1px solid rgba(255,255,255,.3)", borderRadius: 8, padding: ".55rem 1rem", color: "rgba(255,255,255,.7)", fontSize: ".9rem", cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}>
                 로그아웃
               </button>
