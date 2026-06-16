@@ -2,6 +2,7 @@
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import { fetchWithAuth } from '@/lib/fetch-with-auth';
+import RorschachForm from './RorschachForm';
 
 interface Session {
   id: string; session_num: number; session_date: string;
@@ -44,11 +45,6 @@ const TCI_TEMP   = [
 const TCI_CHAR   = [
   { key:'SD', label:'자율성(SD)' }, { key:'C', label:'연대감(C)' },
   { key:'ST', label:'자기초월(ST)' },
-];
-const RSCH_FIELDS = [
-  { key:'R', label:'R(반응수)' }, { key:'Lambda', label:'Lambda' },
-  { key:'M',  label:'M(인간운동)' }, { key:'FM', label:'FM(동물운동)' },
-  { key:'EA', label:'EA' }, { key:'es', label:'es' }, { key:'D', label:'D점수' },
 ];
 const NEURO_NAMES = ['K-MoCA','MMSE-K','TMT-A','TMT-B','Stroop','WMS-IV','RCFT','BGT','기타'];
 
@@ -151,7 +147,7 @@ export default function Module1({ params }: { params: Promise<{ id: string }> })
       raw_data = form.sct_responses;
     } else if (testCat === '투사검사' && testSub === '로르샤하') {
       test_name = '로르샤하(Rorschach)';
-      RSCH_FIELDS.forEach(s => { if (form.scores[s.key]) scores[s.key] = Number(form.scores[s.key]); });
+      Object.entries(form.scores).forEach(([k, v]) => { if (v !== '') scores[k] = isNaN(Number(v)) ? v : Number(v); });
     } else if (testCat === '투사검사' && testSub === 'HTP') {
       test_name = 'HTP';
       raw_data = JSON.stringify({ house: form.htp_house, tree: form.htp_tree, person: form.htp_person });
@@ -343,7 +339,7 @@ export default function Module1({ params }: { params: Promise<{ id: string }> })
       {/* ── 검사 추가 모달 ── */}
       {showAddTest && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
-          <div className="rounded-2xl p-6 w-full max-w-xl border border-white/10 max-h-[92vh] overflow-y-auto" style={{ background: '#1e293b' }}>
+          <div className={`rounded-2xl p-6 w-full border border-white/10 max-h-[92vh] overflow-y-auto ${testCat === '투사검사' && testSub === '로르샤하' ? 'max-w-4xl' : 'max-w-xl'}`} style={{ background: '#1e293b' }}>
             <div className="flex items-center gap-2 mb-5">
               <span className="text-lg">{catInfo.icon}</span>
               <h2 className="text-white font-bold text-lg">{testCat} 입력
@@ -425,10 +421,7 @@ export default function Module1({ params }: { params: Promise<{ id: string }> })
 
               {/* ── 투사검사 로르샤하 ── */}
               {testCat === '투사검사' && testSub === '로르샤하' && (
-                <div>
-                  <p className="text-white/40 text-xs mb-2">핵심 변인</p>
-                  <div className="grid grid-cols-3 gap-2">{RSCH_FIELDS.map(s => <ScoreInput key={s.key} k={s.key} label={s.label} scores={form.scores} setScores={handleScoreChange} />)}</div>
-                </div>
+                <RorschachForm scores={form.scores} setScores={handleScoreChange} />
               )}
 
               {/* ── 투사검사 HTP ── */}
