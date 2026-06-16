@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, use, useRef } from 'react';
 import Link from 'next/link';
+import { fetchWithAuth } from '@/lib/fetch-with-auth';
 
 interface Message { role: 'user' | 'assistant'; content: string; }
 
@@ -14,7 +15,7 @@ export default function Module5({ params }: { params: Promise<{ id: string }> })
 
   useEffect(() => {
     (async () => {
-      const res = await fetch(`/api/mindlink/cases/${id}`);
+      const res = await fetchWithAuth(`/api/mindlink/cases/${id}`);
       if (res.ok) {
         const d = await res.json();
         if (d.supervision_logs?.length) {
@@ -38,7 +39,7 @@ export default function Module5({ params }: { params: Promise<{ id: string }> })
     setMessages([...newMessages, assistantMsg]);
 
     try {
-      const res = await fetch('/api/mindlink/ai/supervision', {
+      const res = await fetchWithAuth('/api/mindlink/ai/supervision', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ case_id: id, messages: newMessages }),
       });

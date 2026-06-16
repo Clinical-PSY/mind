@@ -2,6 +2,7 @@
 import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { fetchWithAuth } from '@/lib/fetch-with-auth';
 
 interface Case {
   id: string; client_alias: string; age: number; gender: string;
@@ -29,7 +30,7 @@ export default function CaseHub({ params }: { params: Promise<{ id: string }> })
 
   useEffect(() => {
     (async () => {
-      const res = await fetch(`/api/mindlink/cases/${id}`);
+      const res = await fetchWithAuth(`/api/mindlink/cases/${id}`);
       if (!res.ok) { router.replace('/mindlink'); return; }
       const data = await res.json();
       setCaseData(data);
@@ -39,7 +40,7 @@ export default function CaseHub({ params }: { params: Promise<{ id: string }> })
   }, [id, router]);
 
   async function updateStatus() {
-    await fetch(`/api/mindlink/cases/${id}`, {
+    await fetchWithAuth(`/api/mindlink/cases/${id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus }),
     });

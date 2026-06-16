@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { fetchWithAuth } from '@/lib/fetch-with-auth';
 
 interface Case {
   id: string; client_alias: string; age: number; gender: string;
@@ -21,7 +22,7 @@ export default function MindLinkDashboard() {
 
   async function fetchCases() {
     setLoading(true);
-    const res = await fetch('/api/mindlink/cases');
+    const res = await fetchWithAuth('/api/mindlink/cases');
     if (res.ok) setCases(await res.json());
     setLoading(false);
   }
@@ -29,7 +30,7 @@ export default function MindLinkDashboard() {
   async function createCase() {
     if (!form.client_alias || !form.age || !form.presenting_problems) { setError('필수 항목을 입력하세요.'); return; }
     setCreating(true); setError('');
-    const res = await fetch('/api/mindlink/cases', {
+    const res = await fetchWithAuth('/api/mindlink/cases', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...form, age: Number(form.age) }),

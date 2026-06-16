@@ -14,7 +14,11 @@ export default function MindLinkLayout({ children }: { children: React.ReactNode
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/auth/me');
+        const token = localStorage.getItem('auth_token');
+        if (!token) throw new Error();
+        const res = await fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (!res.ok) throw new Error();
         const data = await res.json();
         if (!['admin', 'subscriber'].includes(data.role)) throw new Error();

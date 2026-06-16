@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
+import { fetchWithAuth } from '@/lib/fetch-with-auth';
 
 interface Report {
   referral_background: string; test_results_summary: string; cognitive_function: string;
@@ -28,7 +29,7 @@ export default function Module2({ params }: { params: Promise<{ id: string }> })
 
   useEffect(() => {
     (async () => {
-      const res = await fetch(`/api/mindlink/cases/${id}`);
+      const res = await fetchWithAuth(`/api/mindlink/cases/${id}`);
       if (res.ok) { const d = await res.json(); if (d.psych_report) setReport(d.psych_report); }
       setLoading(false);
     })();
@@ -36,7 +37,7 @@ export default function Module2({ params }: { params: Promise<{ id: string }> })
 
   async function generate() {
     setGenerating(true); setError('');
-    const res = await fetch('/api/mindlink/ai/report', {
+    const res = await fetchWithAuth('/api/mindlink/ai/report', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ case_id: id }),
     });

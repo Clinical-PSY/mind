@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
+import { fetchWithAuth } from '@/lib/fetch-with-auth';
 
 interface Session {
   id: string; session_num: number; session_date: string; mood_before: number | null;
@@ -28,7 +29,7 @@ export default function Module1({ params }: { params: Promise<{ id: string }> })
 
   async function fetchData() {
     setLoading(true);
-    const res = await fetch(`/api/mindlink/cases/${id}`);
+    const res = await fetchWithAuth(`/api/mindlink/cases/${id}`);
     if (res.ok) {
       const data = await res.json();
       setSessions(data.sessions ?? []);
@@ -40,7 +41,7 @@ export default function Module1({ params }: { params: Promise<{ id: string }> })
   async function addSession() {
     if (!sessionForm.session_num || !sessionForm.session_date) { setError('회기 번호와 날짜는 필수입니다.'); return; }
     setSaving(true); setError('');
-    const res = await fetch(`/api/mindlink/cases/${id}/sessions`, {
+    const res = await fetchWithAuth(`/api/mindlink/cases/${id}/sessions`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...sessionForm, session_num: Number(sessionForm.session_num), mood_before: sessionForm.mood_before ? Number(sessionForm.mood_before) : null, mood_after: sessionForm.mood_after ? Number(sessionForm.mood_after) : null }),
     });
@@ -54,7 +55,7 @@ export default function Module1({ params }: { params: Promise<{ id: string }> })
     let scores: Record<string, number> = {};
     try { scores = JSON.parse(testForm.scores || '{}'); } catch { setError('점수 형식이 올바르지 않습니다 (JSON).'); return; }
     setSaving(true); setError('');
-    const res = await fetch(`/api/mindlink/cases/${id}/tests`, {
+    const res = await fetchWithAuth(`/api/mindlink/cases/${id}/tests`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...testForm, scores }),
     });

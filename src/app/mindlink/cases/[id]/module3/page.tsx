@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
+import { fetchWithAuth } from '@/lib/fetch-with-auth';
 
 interface Concept {
   problem_structure: string; cognitive_emotional_behavioral: string;
@@ -27,7 +28,7 @@ export default function Module3({ params }: { params: Promise<{ id: string }> })
 
   useEffect(() => {
     (async () => {
-      const res = await fetch(`/api/mindlink/cases/${id}`);
+      const res = await fetchWithAuth(`/api/mindlink/cases/${id}`);
       if (res.ok) { const d = await res.json(); if (d.conceptualization) setConcept(d.conceptualization); }
       setLoading(false);
     })();
@@ -35,7 +36,7 @@ export default function Module3({ params }: { params: Promise<{ id: string }> })
 
   async function generate() {
     setGenerating(true); setError('');
-    const res = await fetch('/api/mindlink/ai/conceptualize', {
+    const res = await fetchWithAuth('/api/mindlink/ai/conceptualize', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ case_id: id }),
     });
