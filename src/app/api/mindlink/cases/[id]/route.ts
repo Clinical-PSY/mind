@@ -17,10 +17,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     { data: c },
     { data: sessions },
     { data: tests },
-    { data: report },
+    { data: psych_report },
     { data: conceptualization },
     { data: intervention },
     { data: outcomes },
+    { data: supervision_logs },
   ] = await Promise.all([
     supabase.from('mindlink_cases').select('*').eq('id', id).single(),
     supabase.from('mindlink_sessions').select('*').eq('case_id', id).order('session_num'),
@@ -29,13 +30,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     supabase.from('mindlink_conceptualizations').select('*').eq('case_id', id).single(),
     supabase.from('mindlink_interventions').select('*').eq('case_id', id).single(),
     supabase.from('mindlink_outcomes').select('*').eq('case_id', id).single(),
+    supabase.from('mindlink_supervision_logs').select('*').eq('case_id', id).order('created_at'),
   ]);
 
   if (!c) return NextResponse.json({ error: '사례를 찾을 수 없습니다.' }, { status: 404 });
   if (user.role !== 'admin' && c.counselor_username !== user.username)
     return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
 
-  return NextResponse.json({ case: c, sessions: sessions ?? [], tests: tests ?? [], report, conceptualization, intervention, outcomes });
+  return NextResponse.json({
+    ...c,
+    sessions: sessions ?? [],
+    tests: tests ?? [],
+    psych_report: psych_report ?? null,
+    conceptualization: conceptualization ?? null,
+    intervention: intervention ?? null,
+    outcomes: outcomes ?? null,
+    supervision_logs: supervision_logs ?? [],
+  });
 }
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -44,7 +55,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
 
   const body = await req.json();
-  const allowed = ['name','age','gender','referral_source','presenting_problems','background','status','client_code'];
+  const allowed = ['client_alias', 'age', 'gender', 'referral_source', 'presenting_problems', 'background', 'status'];
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
   allowed.forEach(k => { if (k in body) updates[k] = body[k]; });
 
