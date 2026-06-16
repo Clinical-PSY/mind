@@ -187,15 +187,9 @@ export default function Module1({ params }: { params: Promise<{ id: string }> })
   const filteredTests = tests.filter(t => t.category === testCat);
   const catInfo = CATEGORIES.find(c => c.key === testCat)!;
 
-  // ── 점수 그리드 입력 헬퍼 ─────────────────────────────────────
-  const ScoreInput = ({ k, label }: { k: string; label: string }) => (
-    <div>
-      <label className="text-white/40 text-xs block mb-0.5">{label}</label>
-      <input type="number" value={form.scores[k] ?? ''}
-        onChange={e => setForm(f => ({ ...f, scores: { ...f.scores, [k]: e.target.value } }))}
-        className="w-full rounded-lg px-2 py-1.5 text-white text-sm bg-white/5 border border-white/10 outline-none focus:border-indigo-400" />
-    </div>
-  );
+  function handleScoreChange(k: string, v: string) {
+    setForm(f => ({ ...f, scores: { ...f.scores, [k]: v } }));
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -370,7 +364,7 @@ export default function Module1({ params }: { params: Promise<{ id: string }> })
                 {form.intel_name === '기타' && <Field label="검사명 직접 입력"><input value={form.test_name} onChange={e => setForm(f => ({ ...f, test_name: e.target.value }))} className={inputCls} /></Field>}
                 <div>
                   <p className="text-white/40 text-xs mb-2">지수 점수 (표준점수)</p>
-                  <div className="grid grid-cols-3 gap-2">{INTEL_SCORES.map(s => <ScoreInput key={s.key} k={s.key} label={s.label} />)}</div>
+                  <div className="grid grid-cols-3 gap-2">{INTEL_SCORES.map(s => <ScoreInput key={s.key} k={s.key} label={s.label} scores={form.scores} setScores={handleScoreChange} />)}</div>
                 </div>
               </>}
 
@@ -383,11 +377,11 @@ export default function Module1({ params }: { params: Promise<{ id: string }> })
                 </Field>
                 <div>
                   <p className="text-white/40 text-xs mb-2">타당도 척도 (T점수)</p>
-                  <div className="grid grid-cols-3 gap-2">{MMPI_VALIDITY.map(k => <ScoreInput key={k} k={k} label={k} />)}</div>
+                  <div className="grid grid-cols-3 gap-2">{MMPI_VALIDITY.map(k => <ScoreInput key={k} k={k} label={k} scores={form.scores} setScores={handleScoreChange} />)}</div>
                 </div>
                 <div>
                   <p className="text-white/40 text-xs mb-2">임상 척도 (T점수)</p>
-                  <div className="grid grid-cols-5 gap-2">{MMPI_CLINICAL.map(k => <ScoreInput key={k} k={k} label={k} />)}</div>
+                  <div className="grid grid-cols-5 gap-2">{MMPI_CLINICAL.map(k => <ScoreInput key={k} k={k} label={k} scores={form.scores} setScores={handleScoreChange} />)}</div>
                 </div>
               </>}
 
@@ -395,11 +389,11 @@ export default function Module1({ params }: { params: Promise<{ id: string }> })
               {testCat === '성격검사' && testSub === 'TCI' && <>
                 <div>
                   <p className="text-white/40 text-xs mb-2">기질 척도 (T점수)</p>
-                  <div className="grid grid-cols-2 gap-2">{TCI_TEMP.map(s => <ScoreInput key={s.key} k={s.key} label={s.label} />)}</div>
+                  <div className="grid grid-cols-2 gap-2">{TCI_TEMP.map(s => <ScoreInput key={s.key} k={s.key} label={s.label} scores={form.scores} setScores={handleScoreChange} />)}</div>
                 </div>
                 <div>
                   <p className="text-white/40 text-xs mb-2">성격 척도 (T점수)</p>
-                  <div className="grid grid-cols-3 gap-2">{TCI_CHAR.map(s => <ScoreInput key={s.key} k={s.key} label={s.label} />)}</div>
+                  <div className="grid grid-cols-3 gap-2">{TCI_CHAR.map(s => <ScoreInput key={s.key} k={s.key} label={s.label} scores={form.scores} setScores={handleScoreChange} />)}</div>
                 </div>
               </>}
 
@@ -433,7 +427,7 @@ export default function Module1({ params }: { params: Promise<{ id: string }> })
               {testCat === '투사검사' && testSub === '로르샤하' && (
                 <div>
                   <p className="text-white/40 text-xs mb-2">핵심 변인</p>
-                  <div className="grid grid-cols-3 gap-2">{RSCH_FIELDS.map(s => <ScoreInput key={s.key} k={s.key} label={s.label} />)}</div>
+                  <div className="grid grid-cols-3 gap-2">{RSCH_FIELDS.map(s => <ScoreInput key={s.key} k={s.key} label={s.label} scores={form.scores} setScores={handleScoreChange} />)}</div>
                 </div>
               )}
 
@@ -546,3 +540,21 @@ function ModalButtons({ onCancel, onSave, saving }: { onCancel: () => void; onSa
 }
 
 const inputCls = 'w-full rounded-lg px-3 py-2 text-white text-sm bg-white/5 border border-white/10 outline-none focus:border-indigo-400';
+
+function ScoreInput({ k, label, scores, setScores }: {
+  k: string; label: string;
+  scores: Record<string, string>;
+  setScores: (k: string, v: string) => void;
+}) {
+  return (
+    <div>
+      <label className="text-white/40 text-xs block mb-0.5">{label}</label>
+      <input
+        type="number"
+        value={scores[k] ?? ''}
+        onChange={e => setScores(k, e.target.value)}
+        className="w-full rounded-lg px-2 py-1.5 text-white text-sm bg-white/5 border border-white/10 outline-none focus:border-indigo-400"
+      />
+    </div>
+  );
+}
