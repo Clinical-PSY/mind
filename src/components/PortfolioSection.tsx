@@ -16,7 +16,7 @@ export default function PortfolioSection() {
         <div style={sectionTagStyle}>Portfolio</div>
         <h2 style={sectionTitleStyle}>연구 및 포트폴리오</h2>
         <p style={sectionDescStyle}>KCI 등재 논문 25편, 정부 연구과제 9건, 학술대회 발표 6회</p>
-        <a href="#portfolio" style={{
+        <a href="/portfolio" style={{
           display: "inline-block", marginTop: "1.1rem",
           background: "var(--bs-navy)", color: "#fff",
           padding: ".65rem 1.8rem", borderRadius: 8,

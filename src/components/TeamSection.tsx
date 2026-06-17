@@ -16,7 +16,7 @@ export default function TeamSection() {
             role="대표 · 임상심리학 박사"
             name="최재광 박사"
             desc={<>연구소 설립자 · 건양대학교 겸임교수<br /><strong style={{ color: "rgba(255,255,255,.85)", fontSize: ".8rem" }}>전문영역</strong><br />우울 및 불안 · 성 · 중독<br />학교심리학 · 교정심리학</>}
-            href="#team"
+            href="/team/choi"
           />
         </div>
 
@@ -42,7 +42,7 @@ export default function TeamSection() {
               role="연구원 · 심리상담사"
               name="임소희"
               desc={<>건양대학교 심리상담치료학과 석사과정<br /><strong style={{ fontSize: ".78rem", color: "var(--bs-navy)" }}>전문영역</strong><br />우울·불안 · 청소년 정신건강<br />감정노동 · 스트레스 관리</>}
-              href="#team"
+              href="/team/lim"
             />
           </div>
           <div className="reveal delay-3">
@@ -51,7 +51,7 @@ export default function TeamSection() {
               role="연구원 · 심리상담사"
               name="한지현"
               desc={<>건양대학교 심리상담치료학과 석사과정<br /><strong style={{ fontSize: ".78rem", color: "var(--bs-navy)" }}>전문영역</strong><br />위기청소년 · 교정심리<br />외상 및 애착 · 집단상담</>}
-              href="#team"
+              href="/team/han"
             />
           </div>
         </div>

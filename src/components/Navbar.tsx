@@ -74,7 +74,13 @@ export default function Navbar() {
 
         <ul style={{ display: "flex", gap: "1.6rem", listStyle: "none", margin: 0, padding: 0, alignItems: "center" }} className="nav-links-desktop">
           {navLinks.map(({ href, label }) => (
-            <li key={href}><a href={href} style={navLinkStyle}>{label}</a></li>
+            <li key={href}>
+              {href.startsWith('/#') ? (
+                <a href={href} style={navLinkStyle}>{label}</a>
+              ) : (
+                <Link href={href} style={navLinkStyle}>{label}</Link>
+              )}
+            </li>
           ))}
           <li>
             <a href="/#contact" style={{ ...navLinkStyle, background: "var(--bs-accent)", color: "#fff", padding: ".42rem 1.15rem", borderRadius: 6, fontWeight: 700 }}>
@@ -131,21 +137,39 @@ export default function Navbar() {
           backdropFilter: "blur(10px)",
         }}>
           {navLinks.map(({ href, label }) => (
-            <a
-              key={href}
-              href={href}
-              onClick={() => setMobileOpen(false)}
-              style={{
-                color: "rgba(255,255,255,.85)",
-                textDecoration: "none",
-                fontSize: "1rem",
-                fontWeight: 500,
-                borderBottom: "1px solid rgba(255,255,255,.08)",
-                paddingBottom: "1rem",
-              }}
-            >
-              {label}
-            </a>
+            href.startsWith('/#') ? (
+              <a
+                key={href}
+                href={href}
+                onClick={() => setMobileOpen(false)}
+                style={{
+                  color: "rgba(255,255,255,.85)",
+                  textDecoration: "none",
+                  fontSize: "1rem",
+                  fontWeight: 500,
+                  borderBottom: "1px solid rgba(255,255,255,.08)",
+                  paddingBottom: "1rem",
+                }}
+              >
+                {label}
+              </a>
+            ) : (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setMobileOpen(false)}
+                style={{
+                  color: "rgba(255,255,255,.85)",
+                  textDecoration: "none",
+                  fontSize: "1rem",
+                  fontWeight: 500,
+                  borderBottom: "1px solid rgba(255,255,255,.08)",
+                  paddingBottom: "1rem",
+                }}
+              >
+                {label}
+              </Link>
+            )
           ))}
           <a href="/#contact" onClick={() => setMobileOpen(false)} style={{ color: "var(--bs-accent)", textDecoration: "none", fontSize: "1rem", fontWeight: 700 }}>
             상담 접수 →

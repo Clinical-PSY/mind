@@ -80,7 +80,7 @@ export default function ServicesSection() {
             </div>
             <div style={{ padding: "1.2rem 1.5rem 1.5rem" }}>
               <p style={{ color: "var(--bs-muted)", fontSize: ".86rem", lineHeight: 1.72, margin: 0 }}>{svc.desc}</p>
-              <a href="#services" style={{ display: "inline-block", marginTop: ".8rem", fontSize: ".8rem", fontWeight: 700, color: "var(--bs-accent)", textDecoration: "none" }}>
+              <a href="/services" style={{ display: "inline-block", marginTop: ".8rem", fontSize: ".8rem", fontWeight: 700, color: "var(--bs-accent)", textDecoration: "none" }}>
                 자세히 보기 →
               </a>
             </div>
