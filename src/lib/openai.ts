@@ -1,10 +1,15 @@
 import OpenAI from 'openai';
 
-export const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// 빌드 시점이 아닌 런타임에 초기화 (Vercel 빌드 오류 방지)
+let _client: OpenAI | null = null;
+function getClient() {
+  if (!_client) _client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return _client;
+}
 
 // ── 공통 JSON 호출 ──
 export async function callJSON<T>(system: string, userPrompt: string, maxTokens = 2500): Promise<T> {
-  const res = await openai.chat.completions.create({
+  const res = await getClient().chat.completions.create({
     model: 'gpt-4o',
     max_tokens: maxTokens,
     response_format: { type: 'json_object' },
@@ -19,7 +24,7 @@ export async function callJSON<T>(system: string, userPrompt: string, maxTokens 
 
 // ── 스트리밍 텍스트 호출 (슈퍼비전) ──
 export async function callStream(system: string, messages: { role: string; content: string }[]) {
-  return openai.chat.completions.create({
+  return getClient().chat.completions.create({
     model: 'gpt-4o',
     max_tokens: 1200,
     stream: true,
