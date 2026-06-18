@@ -459,7 +459,7 @@ export default function Module1({ params }: { params: Promise<{ id: string }> })
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-white/40 text-xs mb-6">
-        <Link href="/mindlink" className="hover:text-white">대시보드</Link>
+        <Link href="/mindlink" className="hover:text-white/70 transition-colors">사례 관리</Link>
         <span>›</span>
         <Link href={`/mindlink/cases/${id}`} className="hover:text-white">사례</Link>
         <span>›</span>
