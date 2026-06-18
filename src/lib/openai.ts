@@ -291,8 +291,17 @@ DBT 기술 부재(Linehan 1993), EFT 정서 처리(Greenberg).
     "context":           { "key_concepts": [], "maladaptive_pattern": "", "clinical_indicators": "" },
     "socio_cultural":    { "key_concepts": [], "maladaptive_pattern": "", "clinical_indicators": "" }
   },
+  // network_edges: from_concept/to_concept은 반드시 해당 격자 key_concepts의 항목과 정확히 동일한 문자열이어야 함
+  // key_concepts는 8자 이내 짧은 한국어 구로 작성 (박스 라벨로 사용됨)
   "network_edges": [
-    { "from": "격자키", "to": "격자키", "type": "causes|maintains|correlates|protects", "label": "이 내담자 특정 관계 (15자 이내)" }
+    {
+      "from": "격자키",
+      "from_concept": "출발 개념 (해당 격자 key_concepts 항목과 정확히 일치)",
+      "to": "격자키",
+      "to_concept": "도착 개념 (해당 격자 key_concepts 항목과 정확히 일치)",
+      "type": "causes|maintains|correlates|protects",
+      "bidirectional": false
+    }
   ],
   "summary": "핵심 역동 중심 종합 요약 (3~4문장)",
   "dsm_considerations": "DSM-5-TR 잠정 진단 및 근거",
