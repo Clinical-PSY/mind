@@ -1,140 +1,137 @@
 'use client';
 
-// ── 격자 상수 ──────────────────────────────────────────────────
-const GW = 900;          // SVG 전체 너비
-const GH = 600;          // SVG 전체 높이
-const CW = GW / 3;       // 칸 너비 = 300
-const CH = GH / 3;       // 칸 높이 = 200
-const BOX_W = 116;       // 개념 박스 너비
-const BOX_LINE_H = 17;   // 박스 내 텍스트 줄 높이
-const BOX_PAD_V = 10;    // 박스 상하 내부 패딩
+// ── 격자 상수 ───────────────────────────────────────────────────────
+const GW = 1080;
+const GH = 690;
+const CW  = GW / 3;   // 360 px per cell
+const CH  = GH / 3;   // 230 px per cell
+const NODE_W      = 128;  // concept box width
+const NODE_LINE_H = 17;   // per text line
+const NODE_PAD_V  = 10;   // vertical inner padding
+const CURVE       = 0.24; // bezier curvature factor
 
+// ── 9차원 메타 ──────────────────────────────────────────────────────
 const CELL_META: Record<string, { label: string; row: number; col: number; color: string }> = {
-  attention:         { label: '주의',     row: 0, col: 0, color: '#3b82f6' },
-  cognition:         { label: '인지',     row: 0, col: 1, color: '#8b5cf6' },
-  self:              { label: '자기',     row: 0, col: 2, color: '#06b6d4' },
-  emotion:           { label: '정서',     row: 1, col: 0, color: '#ec4899' },
-  behavior:          { label: '행동',     row: 1, col: 1, color: '#f59e0b' },
-  motivation:        { label: '동기',     row: 1, col: 2, color: '#10b981' },
-  bio_physiological: { label: '생물생리', row: 2, col: 0, color: '#ef4444' },
-  context:           { label: '맥락',     row: 2, col: 1, color: '#a78bfa' },
+  attention:         { label: '주의',     row: 0, col: 0, color: '#60a5fa' },
+  cognition:         { label: '인지',     row: 0, col: 1, color: '#a78bfa' },
+  self:              { label: '자기',     row: 0, col: 2, color: '#22d3ee' },
+  emotion:           { label: '정서',     row: 1, col: 0, color: '#f472b6' },
+  behavior:          { label: '행동',     row: 1, col: 1, color: '#fbbf24' },
+  motivation:        { label: '동기',     row: 1, col: 2, color: '#34d399' },
+  bio_physiological: { label: '생물생리', row: 2, col: 0, color: '#f87171' },
+  context:           { label: '맥락',     row: 2, col: 1, color: '#c084fc' },
   socio_cultural:    { label: '사회문화', row: 2, col: 2, color: '#fb923c' },
 };
 
-const EDGE_COLORS: Record<string, string> = {
-  causes:     '#ef4444',
-  maintains:  '#f59e0b',
-  correlates: '#94a3b8',
-  protects:   '#22c55e',
+// ── 엣지 스타일 ────────────────────────────────────────────────────
+const EDGE_CFG: Record<string, { color: string; dash: string; width: number }> = {
+  causes:     { color: '#f87171', dash: '',      width: 2.4 },
+  maintains:  { color: '#fbbf24', dash: '',      width: 2.0 },
+  correlates: { color: '#94a3b8', dash: '6 3',   width: 1.6 },
+  protects:   { color: '#4ade80', dash: '2 4',   width: 2.0 },
 };
-const EDGE_LABELS: Record<string, string> = {
+const EDGE_LABEL: Record<string, string> = {
   causes: '유발', maintains: '유지', correlates: '상관', protects: '보호',
 };
 
-// ── 타입 ──────────────────────────────────────────────────────
+// ── 타입 ────────────────────────────────────────────────────────────
 interface GridCell {
   key_concepts?: string[];
   maladaptive_pattern?: string;
   clinical_indicators?: string;
 }
-
 interface Edge {
-  from: string;
-  from_concept?: string;
-  to: string;
-  to_concept?: string;
-  type: string;
-  bidirectional?: boolean;
+  from: string; from_concept?: string;
+  to:   string; to_concept?:   string;
+  type: string; bidirectional?: boolean;
 }
+interface NodePos { x: number; y: number; lines: string[]; color: string; boxH: number; }
 
-interface NodePos {
-  x: number;
-  y: number;
-  lines: string[];
-  color: string;
-  boxH: number;
-}
-
-// ── 유틸 ──────────────────────────────────────────────────────
-function wrapKorean(text: string, maxChars = 7): string[] {
+// ── 유틸 ────────────────────────────────────────────────────────────
+function wrapText(text: string, maxCh = 6): string[] {
   if (!text) return [''];
   const lines: string[] = [];
-  for (let i = 0; i < text.length; i += maxChars) lines.push(text.slice(i, i + maxChars));
+  for (let i = 0; i < text.length; i += maxCh) lines.push(text.slice(i, i + maxCh));
   return lines;
 }
 
-function cellConceptPositions(cellKey: string, count: number): Array<{ x: number; y: number }> {
+/** 3가지 배치: 1→중앙 / 2→좌우 / 3→삼각 */
+function conceptPositions(cellKey: string, count: number): { x: number; y: number }[] {
   const m = CELL_META[cellKey];
-  if (!m) return [];
+  if (!m || count === 0) return [];
   const cx = m.col * CW + CW / 2;
   const cy = m.row * CH + CH / 2;
-  if (count === 0) return [];
+  const offX = CW  * 0.22;   // ~80 px
+  const offY = CH  * 0.27;   // ~62 px
   if (count === 1) return [{ x: cx, y: cy }];
-  if (count === 2) return [{ x: cx, y: cy - CH * 0.22 }, { x: cx, y: cy + CH * 0.22 }];
-  return [{ x: cx, y: cy - CH * 0.27 }, { x: cx, y: cy }, { x: cx, y: cy + CH * 0.27 }];
+  if (count === 2) return [{ x: cx - offX, y: cy }, { x: cx + offX, y: cy }];
+  return [
+    { x: cx,        y: cy - offY * 0.9 },
+    { x: cx - offX, y: cy + offY * 0.6 },
+    { x: cx + offX, y: cy + offY * 0.6 },
+  ];
 }
 
-function moveToward(
-  ax: number, ay: number,
-  bx: number, by: number,
-  margin: number,
-): { x: number; y: number } {
+function norm(ax: number, ay: number, bx: number, by: number) {
   const dx = bx - ax, dy = by - ay;
   const len = Math.sqrt(dx * dx + dy * dy);
+  return len < 1 ? { dx: 0, dy: 0, len: 0 } : { dx: dx / len, dy: dy / len, len };
+}
+
+function toward(ax: number, ay: number, bx: number, by: number, d: number) {
+  const { dx, dy, len } = norm(ax, ay, bx, by);
   if (len < 1) return { x: ax, y: ay };
-  return { x: ax + (dx / len) * margin, y: ay + (dy / len) * margin };
+  return { x: ax + dx * d, y: ay + dy * d };
 }
 
-function quadPath(
-  x1: number, y1: number,
-  x2: number, y2: number,
-  curveSide: number, // +1 or -1
-): string {
+function qPath(x1: number, y1: number, x2: number, y2: number, side: number): string {
   const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-  const dx = x2 - x1, dy = y2 - y1;
-  const len = Math.sqrt(dx * dx + dy * dy);
+  const { dx, dy, len } = norm(x1, y1, x2, y2);
   if (len < 1) return `M ${x1} ${y1} L ${x2} ${y2}`;
-  const curvature = len * 0.18 * curveSide;
-  const cx = mx + (-dy / len) * curvature;
-  const cy = my + (dx / len) * curvature;
-  return `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`;
+  const bend = len * CURVE * side;
+  return `M ${x1} ${y1} Q ${mx - dy * bend} ${my + dx * bend} ${x2} ${y2}`;
 }
 
-// ── 컴포넌트 ──────────────────────────────────────────────────
+/** 2차 베지어 t=0.5 지점 */
+function qMid(x1: number, y1: number, x2: number, y2: number, side: number) {
+  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+  const { dx, dy, len } = norm(x1, y1, x2, y2);
+  if (len < 1) return { x: mx, y: my };
+  const bend = len * CURVE * side;
+  const qcx = mx - dy * bend, qcy = my + dx * bend;
+  return { x: 0.25 * x1 + 0.5 * qcx + 0.25 * x2, y: 0.25 * y1 + 0.5 * qcy + 0.25 * y2 };
+}
+
+// ── 컴포넌트 ─────────────────────────────────────────────────────────
 export default function EEMMNetwork({
-  grid,
-  edges,
+  grid, edges,
 }: {
-  grid: Record<string, GridCell>;
+  grid:  Record<string, GridCell>;
   edges: Edge[];
 }) {
-  // 1. 노드 위치 계산
+  // ① 노드 맵 구성
   const nodeMap = new Map<string, NodePos>();
-
-  Object.entries(CELL_META).forEach(([cellKey, meta]) => {
-    const concepts = (grid?.[cellKey]?.key_concepts ?? []).filter(Boolean).slice(0, 3);
-    const positions = cellConceptPositions(cellKey, concepts.length);
-    concepts.forEach((concept, i) => {
+  Object.entries(CELL_META).forEach(([key, meta]) => {
+    const concepts = (grid?.[key]?.key_concepts ?? []).filter(Boolean).slice(0, 3);
+    const positions = conceptPositions(key, concepts.length);
+    concepts.forEach((c, i) => {
       const pos = positions[i];
       if (!pos) return;
-      const lines = wrapKorean(concept);
-      const boxH = lines.length * BOX_LINE_H + BOX_PAD_V * 2;
-      nodeMap.set(`${cellKey}::${concept}`, { x: pos.x, y: pos.y, lines, color: meta.color, boxH });
+      const lines = wrapText(c);
+      const boxH  = lines.length * NODE_LINE_H + NODE_PAD_V * 2;
+      nodeMap.set(`${key}::${c}`, { x: pos.x, y: pos.y, lines, color: meta.color, boxH });
     });
   });
 
-  // 2. 개념 → 노드 위치 조회 (정확 일치 → 셀 내 첫 노드 → 셀 중심 폴백)
+  // ② 노드 위치 조회 (퍼지 매칭 포함)
   function getPos(cellKey: string, concept?: string): { x: number; y: number; boxH: number } {
     if (concept) {
       const exact = nodeMap.get(`${cellKey}::${concept}`);
       if (exact) return exact;
-      for (const [k, v] of nodeMap) {
-        if (k.startsWith(`${cellKey}::`) && (concept.length >= 3) && k.includes(concept.slice(0, 3))) return v;
-      }
+      for (const [k, v] of nodeMap)
+        if (k.startsWith(`${cellKey}::`) && concept.length >= 2 && k.includes(concept.slice(0, 2))) return v;
     }
-    for (const [k, v] of nodeMap) {
-      if (k.startsWith(`${cellKey}::`)) return v;
-    }
+    for (const [k, v] of nodeMap) if (k.startsWith(`${cellKey}::`)) return v;
     const m = CELL_META[cellKey];
     if (!m) return { x: GW / 2, y: GH / 2, boxH: 36 };
     return { x: m.col * CW + CW / 2, y: m.row * CH + CH / 2, boxH: 36 };
@@ -144,132 +141,190 @@ export default function EEMMNetwork({
     <div style={{ width: '100%', overflowX: 'auto' }}>
       <svg
         viewBox={`0 0 ${GW} ${GH}`}
-        style={{ width: '100%', maxWidth: GW, display: 'block', fontFamily: 'system-ui,sans-serif' }}
+        style={{ width: '100%', maxWidth: GW, display: 'block', fontFamily: 'system-ui, sans-serif' }}
       >
-        {/* ── 마커 정의 ── */}
+        {/* ── defs ── */}
         <defs>
-          {Object.entries(EDGE_COLORS).map(([type, color]) => (
-            <marker key={`fwd-${type}`} id={`ah-${type}`}
-              markerWidth="9" markerHeight="8" refX="7" refY="4" orient="auto">
-              <path d="M 0 0 L 9 4 L 0 8 z" fill={color} opacity="0.9" />
+          {/* 드롭 섀도우 */}
+          <filter id="ns" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="rgba(0,0,0,0.6)" />
+          </filter>
+
+          {/* 화살촉 마커 (forward) */}
+          {Object.entries(EDGE_CFG).map(([type, cfg]) => (
+            <marker key={`f-${type}`} id={`af-${type}`}
+              markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+              <path d="M0 0L10 4L0 8z" fill={cfg.color} opacity="0.95" />
             </marker>
           ))}
-          {Object.entries(EDGE_COLORS).map(([type, color]) => (
-            <marker key={`rev-${type}`} id={`ah-rev-${type}`}
-              markerWidth="9" markerHeight="8" refX="2" refY="4" orient="auto-start-reverse">
-              <path d="M 9 0 L 0 4 L 9 8 z" fill={color} opacity="0.9" />
+          {/* 화살촉 마커 (reverse) */}
+          {Object.entries(EDGE_CFG).map(([type, cfg]) => (
+            <marker key={`r-${type}`} id={`ar-${type}`}
+              markerWidth="10" markerHeight="8" refX="1" refY="4" orient="auto-start-reverse">
+              <path d="M10 0L0 4L10 8z" fill={cfg.color} opacity="0.95" />
             </marker>
+          ))}
+
+          {/* 셀별 배경 그라디언트 */}
+          {Object.entries(CELL_META).map(([key, m]) => (
+            <radialGradient key={key} id={`bg-${key}`}
+              cx="50%" cy="50%" r="60%" fx="50%" fy="50%">
+              <stop offset="0%"   stopColor={m.color} stopOpacity="0.12" />
+              <stop offset="100%" stopColor={m.color} stopOpacity="0.03" />
+            </radialGradient>
           ))}
         </defs>
 
-        {/* ── 격자 배경 칸 ── */}
-        {Object.entries(CELL_META).map(([key, meta]) => (
+        {/* ── 셀 배경 ── */}
+        {Object.entries(CELL_META).map(([key, m]) => (
           <rect key={key}
-            x={meta.col * CW + 1} y={meta.row * CH + 1}
-            width={CW - 2} height={CH - 2}
-            rx={6}
-            fill={meta.color + '09'}
-            stroke={meta.color + '30'}
+            x={m.col * CW + 1} y={m.row * CH + 1}
+            width={CW - 2}     height={CH - 2}
+            rx={10}
+            fill={`url(#bg-${key})`}
+            stroke={m.color + '30'}
             strokeWidth={1}
           />
         ))}
 
-        {/* ── 격자 라벨 ── */}
-        {Object.entries(CELL_META).map(([key, meta]) => (
-          <text key={key}
-            x={meta.col * CW + 10} y={meta.row * CH + 19}
-            fontSize={12} fontWeight="700"
-            fill={meta.color} opacity={0.55}
-            style={{ userSelect: 'none' }}
-          >{meta.label}</text>
+        {/* ── 격자 구분선 ── */}
+        {[1, 2].map(i => (
+          <line key={`vc${i}`}
+            x1={i * CW} y1={4} x2={i * CW} y2={GH - 4}
+            stroke="rgba(255,255,255,0.07)" strokeWidth={1} />
+        ))}
+        {[1, 2].map(i => (
+          <line key={`hc${i}`}
+            x1={4} y1={i * CH} x2={GW - 4} y2={i * CH}
+            stroke="rgba(255,255,255,0.07)" strokeWidth={1} />
         ))}
 
-        {/* ── 화살표 ── */}
-        {(edges ?? []).map((edge, i) => {
-          const fm = CELL_META[edge.from], tm = CELL_META[edge.to];
-          if (!fm || !tm) return null;
+        {/* ── 셀 레이블 ── */}
+        {Object.entries(CELL_META).map(([key, m]) => (
+          <g key={key}>
+            <circle cx={m.col * CW + 14} cy={m.row * CH + 18} r={3.5} fill={m.color} opacity={0.9} />
+            <text
+              x={m.col * CW + 22} y={m.row * CH + 23}
+              fontSize={11.5} fontWeight="700"
+              fill={m.color} opacity={0.75}
+              style={{ userSelect: 'none' }}
+            >{m.label}</text>
+          </g>
+        ))}
 
-          const fp = getPos(edge.from, edge.from_concept);
-          const tp = getPos(edge.to, edge.to_concept);
+        {/* ── 엣지 ── */}
+        {(edges ?? []).map((edge, i) => {
+          if (!CELL_META[edge.from] || !CELL_META[edge.to]) return null;
+          const cfg = EDGE_CFG[edge.type] ?? EDGE_CFG.correlates;
+          const fp  = getPos(edge.from, edge.from_concept);
+          const tp  = getPos(edge.to,   edge.to_concept);
           if (fp.x === tp.x && fp.y === tp.y) return null;
 
-          const color = EDGE_COLORS[edge.type] ?? '#94a3b8';
-          const fMargin = fp.boxH / 2 + 4;
-          const tMargin = tp.boxH / 2 + 4;
-
-          const fs = moveToward(fp.x, fp.y, tp.x, tp.y, fMargin);
-          const fe = moveToward(tp.x, tp.y, fp.x, fp.y, tMargin);
+          const fm  = fp.boxH / 2 + 7;
+          const tm  = tp.boxH / 2 + 7;
+          const fs  = toward(fp.x, fp.y, tp.x, tp.y, fm);
+          const fe  = toward(tp.x, tp.y, fp.x, fp.y, tm);
+          const mid = qMid(fs.x, fs.y, fe.x, fe.y, 1);
+          const lbl = EDGE_LABEL[edge.type] ?? '';
 
           if (edge.bidirectional) {
+            const mid2 = qMid(fe.x, fe.y, fs.x, fs.y, 1);
             return (
               <g key={i}>
-                <path d={quadPath(fs.x, fs.y, fe.x, fe.y, +1)}
-                  fill="none" stroke={color} strokeWidth={1.8} opacity={0.85}
-                  markerEnd={`url(#ah-${edge.type})`} />
-                <path d={quadPath(fe.x, fe.y, fs.x, fs.y, +1)}
-                  fill="none" stroke={color} strokeWidth={1.8} opacity={0.85}
-                  markerEnd={`url(#ah-${edge.type})`} />
+                <path d={qPath(fs.x, fs.y, fe.x, fe.y, +1)}
+                  fill="none" stroke={cfg.color} strokeWidth={cfg.width}
+                  strokeDasharray={cfg.dash} opacity={0.85}
+                  markerEnd={`url(#af-${edge.type})`} />
+                <path d={qPath(fe.x, fe.y, fs.x, fs.y, +1)}
+                  fill="none" stroke={cfg.color} strokeWidth={cfg.width}
+                  strokeDasharray={cfg.dash} opacity={0.85}
+                  markerEnd={`url(#af-${edge.type})`} />
+                <rect x={mid.x - 14} y={mid.y - 10} width={28} height={14} rx={4}
+                  fill="rgba(7,12,24,0.75)" />
+                <text x={mid.x} y={mid.y} textAnchor="middle" dominantBaseline="middle"
+                  fontSize={9} fontWeight="600" fill={cfg.color} opacity={0.85}
+                  style={{ userSelect: 'none' }}>{lbl}↔</text>
               </g>
             );
           }
 
           return (
-            <path key={i}
-              d={quadPath(fs.x, fs.y, fe.x, fe.y, +1)}
-              fill="none" stroke={color} strokeWidth={1.8} opacity={0.85}
-              markerEnd={`url(#ah-${edge.type})`}
-            />
+            <g key={i}>
+              <path d={qPath(fs.x, fs.y, fe.x, fe.y, +1)}
+                fill="none" stroke={cfg.color} strokeWidth={cfg.width}
+                strokeDasharray={cfg.dash} opacity={0.85}
+                markerEnd={`url(#af-${edge.type})`} />
+              {lbl && (
+                <>
+                  <rect x={mid.x - 12} y={mid.y - 9} width={24} height={13} rx={4}
+                    fill="rgba(7,12,24,0.75)" />
+                  <text x={mid.x} y={mid.y - 2} textAnchor="middle" dominantBaseline="middle"
+                    fontSize={9} fontWeight="600" fill={cfg.color} opacity={0.85}
+                    style={{ userSelect: 'none' }}>{lbl}</text>
+                </>
+              )}
+            </g>
           );
         })}
 
-        {/* ── 개념 박스 ── */}
-        {Array.from(nodeMap.entries()).map(([key, node]) => (
-          <g key={key}>
-            {/* 그림자 효과 */}
-            <rect
-              x={node.x - BOX_W / 2 + 2} y={node.y - node.boxH / 2 + 2}
-              width={BOX_W} height={node.boxH} rx={7}
-              fill="rgba(0,0,0,0.4)"
-            />
-            {/* 박스 본체 */}
-            <rect
-              x={node.x - BOX_W / 2} y={node.y - node.boxH / 2}
-              width={BOX_W} height={node.boxH} rx={7}
-              fill="#0f172a"
-              stroke={node.color}
-              strokeWidth={1.8}
-            />
-            {/* 텍스트 */}
-            {node.lines.map((line, li) => {
-              const totalH = node.lines.length * BOX_LINE_H;
-              const startY = node.y - totalH / 2 + BOX_LINE_H / 2;
-              return (
-                <text key={li}
-                  x={node.x} y={startY + li * BOX_LINE_H}
-                  textAnchor="middle" dominantBaseline="middle"
-                  fontSize={12.5} fontWeight="600"
-                  fill="rgba(255,255,255,0.92)"
-                  style={{ userSelect: 'none' }}
-                >{line}</text>
-              );
-            })}
-          </g>
-        ))}
+        {/* ── 개념 노드 ── */}
+        {Array.from(nodeMap.entries()).map(([key, nd]) => {
+          const rx = nd.lines.length === 1 ? nd.boxH / 2 : 10;
+          return (
+            <g key={key} filter="url(#ns)">
+              {/* 글로우 halo */}
+              <rect
+                x={nd.x - NODE_W / 2 - 2} y={nd.y - nd.boxH / 2 - 2}
+                width={NODE_W + 4}         height={nd.boxH + 4}
+                rx={rx + 2}
+                fill="none"
+                stroke={nd.color} strokeWidth={3} opacity={0.18}
+              />
+              {/* 박스 */}
+              <rect
+                x={nd.x - NODE_W / 2} y={nd.y - nd.boxH / 2}
+                width={NODE_W}        height={nd.boxH}
+                rx={rx}
+                fill="#080e1c"
+                stroke={nd.color} strokeWidth={1.8}
+              />
+              {/* 텍스트 */}
+              {nd.lines.map((line, li) => {
+                const totalH = nd.lines.length * NODE_LINE_H;
+                const sy     = nd.y - totalH / 2 + NODE_LINE_H / 2;
+                return (
+                  <text key={li}
+                    x={nd.x} y={sy + li * NODE_LINE_H}
+                    textAnchor="middle" dominantBaseline="middle"
+                    fontSize={12.5} fontWeight="650"
+                    fill="rgba(255,255,255,0.92)"
+                    style={{ userSelect: 'none' }}
+                  >{line}</text>
+                );
+              })}
+            </g>
+          );
+        })}
       </svg>
 
       {/* ── 범례 ── */}
-      <div style={{ display: 'flex', gap: 20, marginTop: 10, flexWrap: 'wrap' }}>
-        {Object.entries(EDGE_COLORS).map(([type, color]) => (
-          <div key={type} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <svg width={32} height={14} style={{ overflow: 'visible' }}>
+      <div style={{ display: 'flex', gap: 24, marginTop: 14, flexWrap: 'wrap', justifyContent: 'center', paddingBottom: 4 }}>
+        {Object.entries(EDGE_CFG).map(([type, cfg]) => (
+          <div key={type} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width={40} height={16} style={{ overflow: 'visible' }}>
               <defs>
-                <marker id={`leg-${type}`} markerWidth="7" markerHeight="6" refX="6" refY="3" orient="auto">
-                  <path d="M 0 0 L 7 3 L 0 6 z" fill={color} />
+                <marker id={`lg-${type}`} markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+                  <path d="M0 0L8 3L0 6z" fill={cfg.color} />
                 </marker>
               </defs>
-              <line x1={0} y1={7} x2={26} y2={7} stroke={color} strokeWidth={1.6} markerEnd={`url(#leg-${type})`} />
+              <line x1={0} y1={8} x2={30} y2={8}
+                stroke={cfg.color} strokeWidth={cfg.width}
+                strokeDasharray={cfg.dash}
+                markerEnd={`url(#lg-${type})`} />
             </svg>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{EDGE_LABELS[type]}</span>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>
+              {EDGE_LABEL[type]}
+            </span>
           </div>
         ))}
       </div>
