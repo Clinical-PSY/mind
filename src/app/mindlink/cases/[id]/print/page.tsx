@@ -89,15 +89,27 @@ const MMPI_VALIDITY_KEYS = ['L', 'F', 'K'];
 const MMPI_CLINICAL_KEYS = ['Hs', 'D', 'Hy', 'Pd', 'Mf', 'Pa', 'Pt', 'Sc', 'Ma', 'Si'];
 const MMPI_CLINICAL_NUMS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
-// Rorschach structural summary sections
-const RORSCHACH_SECTIONS: { title: string; keys: string[] }[] = [
-  { title: '위치 특성', keys: ['R', 'W', 'D', 'Dd', 'S', 'DQ+', 'DQo', 'DQv', 'Zf', 'ZSum', 'ZEst', 'W+D'] },
-  { title: '결정인', keys: ['M', 'FM', 'm', 'FC', 'CF', 'C', "FC'", "C'F", "C'", 'FT', 'TF', 'T', 'FV', 'VF', 'V', 'FY', 'YF', 'Y', 'Fr', 'rF', 'FD', 'F', 'Cn', 'FC:CF+C'] },
-  { title: '핵심·비율', keys: ['L', 'EB', 'EA', 'eb', 'es', 'D', 'AdjD', 'EBPer', "SumC'", 'SumT', 'SumV', 'SumY', 'WSumC', 'Afr', 'P'] },
-  { title: '인지·지각', keys: ['XA%', 'WDA%', 'X-%', 'X+%', 'F+%', 'Xu%', 'WSum6', 'Sum6', '2AB+Art+Ay', 'Ma', 'Mp', 'Ma:Mp'] },
-  { title: '자기·대인', keys: ['Fr+rF', '3r+(2)/R', 'FD', 'MOR', 'An+Xy', 'GHR', 'PHR', 'COP', 'AG', 'a:p', 'Sum H', 'Fd'] },
-  { title: '내용', keys: ['H', '(H)', 'Hd', '(Hd)', 'Hx', 'A', '(A)', 'Ad', '(Ad)', 'An', 'Art', 'Ay', 'Bl', 'Bt', 'Cg', 'Ex', 'Fi', 'Fd', 'Ge', 'Hh', 'Ls', 'Na', 'Sc', 'Sx', 'Xy', 'Id'] },
+// TCI subscales: temperament then character
+const TCI_TEMPERAMENT: { key: string; label: string }[] = [
+  { key: 'NS', label: '자극추구(NS)' },
+  { key: 'HA', label: '위험회피(HA)' },
+  { key: 'RD', label: '사회적 민감성(RD)' },
+  { key: 'P',  label: '인내력(P)' },
 ];
+const TCI_CHARACTER: { key: string; label: string }[] = [
+  { key: 'SD', label: '자율성(SD)' },
+  { key: 'C',  label: '연대감(C)' },
+  { key: 'ST', label: '자기초월(ST)' },
+];
+
+// Tests to include in the report
+function isIncludedTest(t: TestResult): boolean {
+  const n = (t.test_name + t.sub_type + t.category).toLowerCase();
+  const isIntel = t.category === '지능검사' || n.includes('wais') || n.includes('wisc') || n.includes('k-abc');
+  const isMMPI  = t.sub_type === 'MMPI' || n.includes('mmpi');
+  const isTCI   = t.sub_type === 'TCI'  || n.includes('tci');
+  return isIntel || isMMPI || isTCI;
+}
 
 // ── SVG Profile Chart ─────────────────────────────────────────────────
 interface ChartPoint { label: string; value: number; }
@@ -317,195 +329,59 @@ function MMPIDisplay({ test }: { test: TestResult }) {
   );
 }
 
-// ── SCT Display ───────────────────────────────────────────────────────
-const SCT_CATEGORIES: { label: string; keywords: RegExp }[] = [
-  { label: '자기·자아상', keywords: /나는|나의|내가|자신|자아|스스로|나에게|내 자신/ },
-  { label: '가족·부모', keywords: /어머니|아버지|부모|엄마|아빠|형제|자매|가족|집|남편|아내|배우자/ },
-  { label: '대인관계·이성', keywords: /친구|사람|사람들|이성|관계|남자|여자|선생님|동료|타인|사회/ },
-  { label: '직업·학업·미래', keywords: /직업|일|공부|학교|미래|장래|꿈|목표|성공|실패|직장/ },
-  { label: '정서·갈등', keywords: /두렵|무서|걱정|불안|화|슬프|우울|행복|기쁨|힘들|어려|고통/ },
-];
-
-function SCTDisplay({ test }: { test: TestResult }) {
-  const raw = test.raw_data || '';
-  if (!raw.trim()) return test.interpretation ? (
-    <p style={{ fontSize: 9.5, color: '#222', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{test.interpretation}</p>
-  ) : null;
-
-  // Parse lines: "숫자. 줄기 [완성]" or "줄기: 완성" or just numbered lines
-  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
-  const items: { stem: string; completion: string; raw: string }[] = lines.map(line => {
-    // Try "번호. 내용" or "내용"
-    const m = line.match(/^(\d+[.)]\s*)(.+)$/);
-    const content = m ? m[2] : line;
-    // Try to split on "_" or "[" or common separators
-    const splitMatch = content.match(/^(.+?)[\[_—:→](.+)/);
-    if (splitMatch) return { stem: splitMatch[1].trim(), completion: splitMatch[2].replace(/\]$/, '').trim(), raw: line };
-    return { stem: content, completion: '', raw: line };
-  });
-
-  // Categorize
-  const categorized: Record<string, typeof items> = {};
-  const uncategorized: typeof items = [];
-  SCT_CATEGORIES.forEach(c => { categorized[c.label] = []; });
-
-  items.forEach(item => {
-    const text = item.stem + item.completion;
-    let matched = false;
-    for (const cat of SCT_CATEGORIES) {
-      if (cat.keywords.test(text)) { categorized[cat.label].push(item); matched = true; break; }
-    }
-    if (!matched) uncategorized.push(item);
-  });
-
-  const hasCategories = SCT_CATEGORIES.some(c => categorized[c.label].length > 0);
-
-  return (
-    <div style={{ marginTop: 6 }}>
-      {test.interpretation && (
-        <div style={{ padding: '8px 12px', background: '#f7f7f7', border: '1px solid #ddd', marginBottom: 12, borderLeft: '3px solid #555' }}>
-          <div style={{ fontSize: 8, color: '#888', marginBottom: 3 }}>해석 요약</div>
-          <p style={{ fontSize: 9.5, color: '#222', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{test.interpretation}</p>
-        </div>
-      )}
-      {hasCategories ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {SCT_CATEGORIES.map(cat => {
-            const its = categorized[cat.label];
-            if (!its.length) return null;
-            return (
-              <div key={cat.label} style={{ border: '1px solid #ddd', overflow: 'hidden' }}>
-                <div style={{ background: '#333', color: '#fff', fontSize: 8, fontWeight: '700', padding: '4px 10px', letterSpacing: '0.05em' }}>
-                  {cat.label}
-                </div>
-                <div style={{ padding: '6px 10px' }}>
-                  {its.map((item, i) => (
-                    <div key={i} style={{ marginBottom: 4 }}>
-                      {item.completion ? (
-                        <p style={{ fontSize: 8.5, color: '#222', lineHeight: 1.7, margin: 0 }}>
-                          <span style={{ color: '#777' }}>{item.stem}&nbsp;</span>
-                          <span style={{ fontWeight: '600' }}>{item.completion}</span>
-                        </p>
-                      ) : (
-                        <p style={{ fontSize: 8.5, color: '#333', lineHeight: 1.7, margin: 0 }}>{item.stem}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-          {uncategorized.length > 0 && (
-            <div style={{ border: '1px solid #ddd', overflow: 'hidden', gridColumn: '1/-1' }}>
-              <div style={{ background: '#555', color: '#fff', fontSize: 8, fontWeight: '700', padding: '4px 10px' }}>기타</div>
-              <div style={{ padding: '6px 10px', columns: 2, gap: 20 }}>
-                {uncategorized.map((item, i) => (
-                  <p key={i} style={{ fontSize: 8.5, color: '#333', lineHeight: 1.7, margin: '0 0 3px', breakInside: 'avoid' }}>{item.raw}</p>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        <pre style={{ fontSize: 8.5, color: '#333', lineHeight: 1.8, whiteSpace: 'pre-wrap', margin: 0, fontFamily: 'inherit' }}>{raw}</pre>
-      )}
-    </div>
-  );
-}
-
-// ── Rorschach Structural Summary ──────────────────────────────────────
-function RorschachDisplay({ test }: { test: TestResult }) {
+// ── TCI Display ───────────────────────────────────────────────────────
+function TCIDisplay({ test }: { test: TestResult }) {
   const sc = test.scores;
-  const allKnownKeys = new Set(RORSCHACH_SECTIONS.flatMap(s => s.keys));
-  const unknownEntries = Object.entries(sc).filter(([k]) => !allKnownKeys.has(k));
+
+  const tempData: ChartPoint[] = TCI_TEMPERAMENT
+    .filter(d => sc[d.key] != null && !isNaN(Number(sc[d.key])))
+    .map(d => ({ label: d.label, value: Number(sc[d.key]) }));
+  const charData: ChartPoint[] = TCI_CHARACTER
+    .filter(d => sc[d.key] != null && !isNaN(Number(sc[d.key])))
+    .map(d => ({ label: d.label, value: Number(sc[d.key]) }));
+
+  const allData = [...tempData, ...charData];
+  if (!allData.length) return null;
+
+  // Detect scale: T-scores (mean≈50) vs percentile (0–100) vs raw
+  const avg = allData.reduce((s, x) => s + x.value, 0) / allData.length;
+  const isTScore = avg > 30 && avg < 80;
+  const mean   = isTScore ? 50 : 50;
+  const sdSize = isTScore ? 10 : 10;
+  const yMin   = 20;
+  const yMax   = 80;
+  const separator = tempData.length > 0 ? tempData.length - 1 : undefined;
 
   return (
     <div style={{ marginTop: 6 }}>
-      {/* Structural summary grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 10 }}>
-        {RORSCHACH_SECTIONS.map(section => {
-          const present = section.keys.filter(k => sc[k] != null && sc[k] !== '');
-          if (!present.length) return null;
-          return (
-            <div key={section.title} style={{ border: '1px solid #ccc', overflow: 'hidden' }}>
-              <div style={{ background: '#222', color: '#fff', fontSize: 8, fontWeight: '700', padding: '4px 8px', letterSpacing: '0.06em' }}>
-                {section.title}
-              </div>
-              <table style={{ width: '100%', fontSize: 8.5, borderCollapse: 'collapse' }}>
-                <tbody>
-                  {present.map(k => (
-                    <tr key={k} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                      <td style={{ padding: '3px 8px', color: '#555', width: '50%', fontFamily: 'monospace, monospace' }}>{k}</td>
-                      <td style={{ padding: '3px 8px', fontWeight: '700', color: '#111', textAlign: 'right' }}>{sc[k]}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          );
-        })}
-        {unknownEntries.length > 0 && (
-          <div style={{ border: '1px solid #ccc', overflow: 'hidden' }}>
-            <div style={{ background: '#555', color: '#fff', fontSize: 8, fontWeight: '700', padding: '4px 8px' }}>기타 점수</div>
-            <table style={{ width: '100%', fontSize: 8.5, borderCollapse: 'collapse' }}>
-              <tbody>
-                {unknownEntries.map(([k, v]) => (
-                  <tr key={k} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                    <td style={{ padding: '3px 8px', color: '#555', fontFamily: 'monospace, monospace' }}>{k}</td>
-                    <td style={{ padding: '3px 8px', fontWeight: '700', color: '#111', textAlign: 'right' }}>{v}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div style={{ fontSize: 8, color: '#888', marginBottom: 6 }}>
+        T점수 | 평균: 50 | 굵은 글씨: ±1SD 이탈 | 점선 구분: 기질 ／ 성격
       </div>
-      {/* Raw data if any */}
-      {test.raw_data && (
-        <div style={{ fontSize: 8.5, color: '#555', padding: '6px 10px', background: '#f8f8f8', border: '1px solid #eee', whiteSpace: 'pre-wrap', lineHeight: 1.7, fontFamily: 'monospace, monospace' }}>
-          {test.raw_data}
-        </div>
-      )}
-      {/* Interpretation */}
+      <ProfileChart data={allData} mean={mean} sdSize={sdSize} yMin={yMin} yMax={yMax} separator={separator} />
+      <table style={{ fontSize: 8.5, marginTop: 8, borderCollapse: 'collapse', border: '1px solid #ccc', width: '100%' }}>
+        <tbody>
+          <tr>
+            {allData.map(d => (
+              <td key={d.label} style={{ padding: '4px 8px', textAlign: 'center', border: '1px solid #ddd', background: '#f9f9f9', fontSize: 7.5, color: '#666' }}>
+                {d.label}
+              </td>
+            ))}
+          </tr>
+          <tr>
+            {allData.map(d => {
+              const isOut = Math.abs(d.value - mean) >= sdSize;
+              return (
+                <td key={d.label} style={{ padding: '4px 8px', textAlign: 'center', border: '1px solid #ddd', fontWeight: isOut ? '700' : '400', color: '#111' }}>
+                  {d.value}
+                </td>
+              );
+            })}
+          </tr>
+        </tbody>
+      </table>
       {test.interpretation && (
-        <div style={{ marginTop: 8, padding: '8px 12px', borderLeft: '3px solid #555', background: '#f7f7f7' }}>
+        <div style={{ marginTop: 10, padding: '8px 12px', borderLeft: '3px solid #aaa', background: '#f7f7f7' }}>
           <div style={{ fontSize: 8, color: '#888', marginBottom: 3 }}>해석</div>
-          <p style={{ fontSize: 9.5, color: '#222', lineHeight: 1.8, whiteSpace: 'pre-wrap', margin: 0 }}>{test.interpretation}</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Generic test display ──────────────────────────────────────────────
-function DefaultTestDisplay({ test }: { test: TestResult }) {
-  const hasScores = Object.keys(test.scores || {}).length > 0;
-  let htpData: Record<string, string> | null = null;
-  if (test.sub_type === 'HTP' && test.raw_data) { try { htpData = JSON.parse(test.raw_data); } catch { /**/ } }
-
-  return (
-    <div style={{ marginTop: 6 }}>
-      {hasScores && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>
-          {Object.entries(test.scores).slice(0, 40).map(([k, v]) => (
-            <span key={k} style={{ fontSize: 8.5, padding: '2px 8px', background: '#f3f3f3', border: '1px solid #ddd', color: '#333' }}>
-              {k}: <strong style={{ color: '#111' }}>{v}</strong>
-            </span>
-          ))}
-        </div>
-      )}
-      {htpData && (
-        <div style={{ fontSize: 9, color: '#444', lineHeight: 1.7, marginBottom: 6 }}>
-          {htpData.house  && <p style={{ margin: '2px 0' }}>집(H): {htpData.house}</p>}
-          {htpData.tree   && <p style={{ margin: '2px 0' }}>나무(T): {htpData.tree}</p>}
-          {htpData.person && <p style={{ margin: '2px 0' }}>사람(P): {htpData.person}</p>}
-        </div>
-      )}
-      {!htpData && test.raw_data && test.sub_type !== '로르샤하' && (
-        <p style={{ fontSize: 9, color: '#444', whiteSpace: 'pre-wrap', lineHeight: 1.7, marginBottom: 6 }}>{test.raw_data}</p>
-      )}
-      {test.interpretation && (
-        <div style={{ padding: '7px 12px', borderLeft: '3px solid #aaa', background: '#f7f7f7' }}>
           <p style={{ fontSize: 9.5, color: '#222', lineHeight: 1.8, whiteSpace: 'pre-wrap', margin: 0 }}>{test.interpretation}</p>
         </div>
       )}
@@ -520,17 +396,27 @@ function TestDisplay({ test }: { test: TestResult }) {
     return <IntelDisplay test={test} />;
   if (test.sub_type === 'MMPI' || n.includes('mmpi'))
     return <MMPIDisplay test={test} />;
-  if (test.sub_type === 'SCT' || n.includes('sct') || n.includes('문장완성'))
-    return <SCTDisplay test={test} />;
-  if (test.sub_type === '로르샤하' || n.includes('로르샤하') || n.includes('rorschach'))
-    return <RorschachDisplay test={test} />;
-  return <DefaultTestDisplay test={test} />;
+  if (test.sub_type === 'TCI' || n.includes('tci'))
+    return <TCIDisplay test={test} />;
+  return null;
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────
 export default function PrintPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [data, setData] = useState<CaseData | null>(null);
+
+  useEffect(() => {
+    // Force white background regardless of app theme
+    document.documentElement.style.background = '#ffffff';
+    document.body.style.background = '#ffffff';
+    document.body.style.color = '#111111';
+    return () => {
+      document.documentElement.style.background = '';
+      document.body.style.background = '';
+      document.body.style.color = '';
+    };
+  }, []);
 
   useEffect(() => {
     fetchWithAuth(`/api/mindlink/cases/${id}`)
@@ -563,10 +449,13 @@ export default function PrintPage({ params }: { params: Promise<{ id: string }> 
           .avoid-break { page-break-inside: avoid; break-inside: avoid; }
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+          background: #ffffff !important;
+          color: #111111;
+        }
         body {
           font-family: 'Malgun Gothic', '맑은 고딕', 'Apple SD Gothic Neo', sans-serif;
           font-size: 10pt; line-height: 1.75;
-          background: #ffffff; color: #111111;
         }
         table { border-collapse: collapse; }
         p { margin: 0; }
@@ -584,7 +473,7 @@ export default function PrintPage({ params }: { params: Promise<{ id: string }> 
         </button>
       </div>
 
-      <div style={{ maxWidth: 794, margin: '0 auto', padding: '32px 0' }}>
+      <div style={{ maxWidth: 794, margin: '0 auto', padding: '32px 0', backgroundColor: '#ffffff', minHeight: '100vh' }}>
 
         {/* ── 레터헤드 ── */}
         <div style={{ borderTop: '3px solid #111', paddingTop: 12, paddingBottom: 12, borderBottom: '1px solid #888', marginBottom: 0 }}>
@@ -793,11 +682,11 @@ export default function PrintPage({ params }: { params: Promise<{ id: string }> 
         )}
 
         {/* ══ Ⅳ. 심리검사 원데이터 ══ */}
-        {data.tests.length > 0 && (
+        {data.tests.filter(isIncludedTest).length > 0 && (
           <div className="page-break">
-            <DocSection num="Ⅳ" title="심리검사 원데이터" sub="Test Data Summary">
-              {data.tests.map((t, ti) => (
-                <div key={t.id} className="avoid-break" style={{ marginBottom: 20, paddingBottom: 20, borderBottom: ti < data.tests.length - 1 ? '1px solid #e8e8e8' : 'none' }}>
+            <DocSection num="Ⅳ" title="심리검사 원데이터" sub="Test Data Summary · 지능검사 / MMPI-2 / TCI">
+              {data.tests.filter(isIncludedTest).map((t, ti, arr) => (
+                <div key={t.id} className="avoid-break" style={{ marginBottom: 20, paddingBottom: 20, borderBottom: ti < arr.length - 1 ? '1px solid #e8e8e8' : 'none' }}>
                   {/* Test header */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, paddingBottom: 6, borderBottom: '1px solid #eee' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 21, height: 21, borderRadius: '50%', background: '#333', color: '#fff', fontSize: 9, fontWeight: 700, flexShrink: 0 }}>
