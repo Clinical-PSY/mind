@@ -1,23 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getUserFromRequest } from '@/lib/auth-utils';
-import { callStream, SUPERVISION_SYSTEM } from '@/lib/openai';
+import { callStream, SUPERVISION_SYSTEM, VERBATIM_SUPERVISION_SYSTEM } from '@/lib/openai';
 
 export async function POST(req: NextRequest) {
   const user = await getUserFromRequest(req);
   if (!user || !['admin', 'subscriber'].includes(user.role))
     return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
 
-  const { case_id, messages } = await req.json();
+  const { case_id, messages, mode } = await req.json();
 
-  let systemPrompt = SUPERVISION_SYSTEM;
+  const isVerbatim = mode === 'verbatim';
+  let systemPrompt = isVerbatim ? VERBATIM_SUPERVISION_SYSTEM : SUPERVISION_SYSTEM;
+
   if (case_id) {
     const [{ data: c }, { data: concept }] = await Promise.all([
       supabase.from('mindlink_cases').select('*').eq('id', case_id).single(),
       supabase.from('mindlink_conceptualizations').select('summary,dsm_considerations').eq('case_id', case_id).single(),
     ]);
     if (c) {
-      systemPrompt += `\n\n## 현재 상담 사례\n- 내담자: ${c.age}세 ${c.gender}, 주호소: ${c.presenting_problems}\n- 배경: ${c.background?.slice(0, 300)}\n- 총 회기 기록 수: (별도 조회 필요)`;
+      systemPrompt += `\n\n## 현재 상담 사례 맥락\n- 내담자: ${c.age}세 ${c.gender}, 주호소: ${c.presenting_problems}\n- 배경: ${c.background?.slice(0, 300)}`;
       if (concept) systemPrompt += `\n- 사례개념화 요약: ${concept.summary?.slice(0, 400)}\n- DSM 고려: ${concept.dsm_considerations?.slice(0, 200)}`;
     }
   }
