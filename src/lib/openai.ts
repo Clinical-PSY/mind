@@ -357,27 +357,42 @@ socio_cultural → 대인관계 기술, 사회적 지지 강화, 가족 개입
   },
   "_therapeutic_network": {
     "description": "개입 후 예상되는 전체 네트워크 변화 (2~3문장)",
+    "intervention_nodes": [
+      { "cell": "셀키", "label": "치료개념(8자이내)", "dimension": "차원키" }
+    ],
+    "target_connections": [
+      { "from_label": "치료개념명", "from_cell": "셀키", "to_concept": "기존개념명", "to_cell": "셀키", "type": "targets|reduces|activates", "dimension": "차원키", "reason": "한문장" }
+    ],
     "weakened_edges": [
-      { "from": "셀키", "from_concept": "개념명", "to": "셀키", "to_concept": "개념명", "type": "causes", "reason": "약화 이유 (1문장)", "dimension": "이변화를유발하는개입차원키" }
+      { "from": "셀키", "from_concept": "개념명", "to": "셀키", "to_concept": "개념명", "type": "causes", "reason": "약화 이유 (1문장)", "dimension": "차원키" }
     ],
     "new_edges": [
-      { "from": "셀키", "from_concept": "개념명", "to": "셀키", "to_concept": "개념명", "type": "protects", "reason": "형성 이유 (1문장)", "dimension": "이변화를유발하는개입차원키" }
+      { "from": "셀키", "from_concept": "개념명", "to": "셀키", "to_concept": "개념명", "type": "protects", "reason": "형성 이유 (1문장)", "dimension": "차원키" }
     ],
     "strengthened_nodes": [
-      { "cell": "셀키", "concept": "강화될 개념명", "change_type": "improve", "change": "변화 내용 (1문장)", "dimension": "이변화를유발하는개입차원키" }
+      { "cell": "셀키", "concept": "강화될 개념명", "change_type": "improve", "change": "변화 내용 (1문장)", "dimension": "차원키" }
     ],
     "overall_prognosis": "전반적 예후 요약 (2~3문장)"
   }
 }
 
-## dimension 필드 필수 규칙
-weakened_edges · new_edges · strengthened_nodes 모든 항목에 "dimension" 필드를 반드시 포함한다.
-dimension 값은 아래 9개 키 중 하나만 사용:
-  attention | cognition | self | emotion | behavior | motivation | bio_physiological | context | socio_cultural
-dimension 의미: 이 네트워크 변화를 주도하는 개입 차원.
-  예) 인지재구조화로 자동적사고→불안 연결 약화 → "dimension": "cognition"
-  예) 자기자비 훈련으로 자기비판 감소 → "dimension": "self"
-  예) 행동활성화로 회피→무기력 연결 약화 → "dimension": "behavior"`;
+## _therapeutic_network 필드 규칙
+모든 배열 항목의 dimension 값 → 9개 키 중 하나: attention|cognition|self|emotion|behavior|motivation|bio_physiological|context|socio_cultural
+
+### intervention_nodes (차원당 최대 2개)
+- 각 차원 개입에서 실제로 활용되는 치료적 개념 노드
+- label: 8자 이내 (예: "마음챙김", "탈융합", "행동활성화", "자기자비")
+- cell: 이 치료 노드가 속하는 EEMM 격자 셀 (보통 해당 dimension과 같은 셀)
+
+### target_connections (차원당 최대 3개)
+- 치료 노드가 기존 부적응 개념을 어떻게 변화시키는지 화살표로 표현
+- from_label: intervention_nodes의 label과 동일한 문자열
+- to_concept: EEMM 격자 key_concepts에 있는 실제 개념명
+- type: "targets"(부적응개념대상), "reduces"(증상감소), "activates"(적응자원활성화)
+
+### weakened_edges: 기존 부적응 연결이 약화되는 것 (dimension당 1~2개)
+### new_edges: 치료 과정에서 새로 형성되는 적응적 연결 (dimension당 1~2개)
+### strengthened_nodes: 강화/신규 부각될 기존 개념 (dimension당 0~1개)`;
 
 export const SUPERVISION_SYSTEM = `당신은 20년 이상 경력의 임상심리 수퍼바이저이다. 상담사의 질문에 이론적 근거와 실무적 조언을 제공한다.
 

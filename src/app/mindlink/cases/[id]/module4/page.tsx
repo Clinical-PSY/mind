@@ -426,8 +426,16 @@ export default function Module4({ params }: { params: Promise<{ id: string }> })
                     {/* 범례 */}
                     <div className="flex flex-wrap gap-4 text-xs text-white/40 px-1">
                       <span className="flex items-center gap-1.5">
+                        <div className="w-5 h-4 rounded border border-dashed border-green-400 bg-green-400/10 flex items-center justify-center text-green-400 font-bold" style={{ fontSize: 7 }}>Tx</div>
+                        치료 개입 노드
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <svg width="24" height="8"><line x1="0" y1="4" x2="24" y2="4" stroke="#c084fc" strokeWidth="2" /></svg>
+                        대상(개입→기존)
+                      </span>
+                      <span className="flex items-center gap-1.5">
                         <svg width="24" height="8"><line x1="0" y1="4" x2="24" y2="4" stroke="#f87171" strokeWidth="2" /></svg>
-                        기존 유발
+                        기존 부적응 연결
                       </span>
                       <span className="flex items-center gap-1.5">
                         <svg width="24" height="8"><line x1="0" y1="4" x2="24" y2="4" stroke="#ef4444" strokeWidth="2" strokeDasharray="5 3" /></svg>
@@ -435,11 +443,7 @@ export default function Module4({ params }: { params: Promise<{ id: string }> })
                       </span>
                       <span className="flex items-center gap-1.5">
                         <svg width="24" height="8"><line x1="0" y1="4" x2="24" y2="4" stroke="#4ade80" strokeWidth="2.5" /></svg>
-                        보호↑
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <svg width="24" height="8"><line x1="0" y1="4" x2="24" y2="4" stroke="#38bdf8" strokeWidth="2" strokeDasharray="3 3" /></svg>
-                        새 상관↑
+                        새 보호↑
                       </span>
                     </div>
 
