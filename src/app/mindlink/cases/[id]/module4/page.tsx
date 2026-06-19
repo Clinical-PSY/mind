@@ -2,7 +2,7 @@
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import { fetchWithAuth } from '@/lib/fetch-with-auth';
-import TherapeuticNetwork from './TherapeuticNetwork';
+import TherapeuticNetwork, { type OriginalEdge, type TherapeuticNetworkData } from './TherapeuticNetwork';
 
 // ── 타입 ────────────────────────────────────────────────────────────
 interface DimIntervention {
@@ -10,13 +10,6 @@ interface DimIntervention {
   target_processes?: string[];
   expected_change?: string;
   rationale?: string;
-}
-interface TherapeuticNetworkData {
-  description?: string;
-  weakened_edges?: { from: string; from_concept: string; to: string; to_concept: string; type: string; reason?: string }[];
-  new_edges?: { from: string; from_concept: string; to: string; to_concept: string; type: string; reason?: string }[];
-  strengthened_nodes?: { cell: string; concept: string; change_type: string; change?: string }[];
-  overall_prognosis?: string;
 }
 interface EemmInterventions {
   attention?: DimIntervention;
@@ -41,7 +34,20 @@ interface Intervention {
   eemm_interventions: EemmInterventions;
 }
 
-// ── GRID_LAYOUT (module3와 동일 구조) ───────────────────────────────
+// ── 9차원 메타 ───────────────────────────────────────────────────────
+const ALL_DIMS = [
+  { key: 'attention',         label: '주의',     color: '#60a5fa' },
+  { key: 'cognition',         label: '인지',     color: '#a78bfa' },
+  { key: 'self',              label: '자기',     color: '#22d3ee' },
+  { key: 'emotion',           label: '정서',     color: '#f472b6' },
+  { key: 'behavior',          label: '행동',     color: '#fbbf24' },
+  { key: 'motivation',        label: '동기',     color: '#34d399' },
+  { key: 'bio_physiological', label: '생물생리', color: '#f87171' },
+  { key: 'context',           label: '맥락',     color: '#c084fc' },
+  { key: 'socio_cultural',    label: '사회문화', color: '#fb923c' },
+] as const;
+
+// ── GRID_LAYOUT ──────────────────────────────────────────────────────
 const GRID_LAYOUT = [
   {
     layerKey: 'psychological', layer: '심리 과정', layerDesc: '내적 처리 시스템', layerColor: '#818cf8',
@@ -75,10 +81,12 @@ export default function Module4({ params }: { params: Promise<{ id: string }> })
   const { id } = use(params);
   const [interv, setInterv] = useState<Intervention | null>(null);
   const [eemmGrid, setEemmGrid] = useState<Record<string, { key_concepts?: string[]; maladaptive_pattern?: string }>>({});
+  const [originalEdges, setOriginalEdges] = useState<OriginalEdge[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [tab, setTab] = useState<TabKey>('overview');
+  const [selectedDim, setSelectedDim] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -87,6 +95,7 @@ export default function Module4({ params }: { params: Promise<{ id: string }> })
         const d = await res.json();
         if (d.intervention) setInterv(d.intervention);
         if (d.conceptualization?.eemm_grid) setEemmGrid(d.conceptualization.eemm_grid);
+        if (d.conceptualization?.network_edges) setOriginalEdges(d.conceptualization.network_edges);
       }
       setLoading(false);
     })();
@@ -111,8 +120,17 @@ export default function Module4({ params }: { params: Promise<{ id: string }> })
     { key: 'network',  label: '치료적 네트워크' },
   ];
 
+  // 차원별 변화 개수
+  function dimChangeCount(dimKey: string) {
+    if (!therapeuticNet) return 0;
+    const w = (therapeuticNet.weakened_edges ?? []).filter(e => e.dimension === dimKey).length;
+    const n = (therapeuticNet.new_edges ?? []).filter(e => e.dimension === dimKey).length;
+    const s = (therapeuticNet.strengthened_nodes ?? []).filter(e => e.dimension === dimKey).length;
+    return w + n + s;
+  }
+
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-4 py-8">
       {/* breadcrumb */}
       <div className="flex items-center gap-2 text-white/40 text-xs mb-6">
         <Link href="/mindlink" className="hover:text-white/70 transition-colors">사례 관리</Link>
@@ -165,7 +183,6 @@ export default function Module4({ params }: { params: Promise<{ id: string }> })
           {/* ── TAB 1: 전략 개요 ── */}
           {tab === 'overview' && (
             <div className="space-y-5">
-              {/* theory + duration + structure */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {interv.recommended_theory && (
                   <div className="rounded-xl p-5 border border-white/10" style={{ background: 'rgba(255,255,255,0.03)' }}>
@@ -189,7 +206,6 @@ export default function Module4({ params }: { params: Promise<{ id: string }> })
                 </div>
               </div>
 
-              {/* goals */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {interv.short_term_goals?.length > 0 && (
                   <div className="rounded-xl p-5 border border-yellow-500/20" style={{ background: 'rgba(255,255,255,0.03)' }}>
@@ -217,7 +233,6 @@ export default function Module4({ params }: { params: Promise<{ id: string }> })
                 )}
               </div>
 
-              {/* key techniques */}
               {interv.key_techniques?.length > 0 && (
                 <div className="rounded-xl p-5 border border-white/10" style={{ background: 'rgba(255,255,255,0.03)' }}>
                   <h3 className="text-white/50 text-xs font-medium mb-3 uppercase tracking-wider">핵심 치료 기법</h3>
@@ -236,7 +251,6 @@ export default function Module4({ params }: { params: Promise<{ id: string }> })
                   <p className="text-white/70 text-sm leading-relaxed">{interv.considerations}</p>
                 </div>
               )}
-
               <div className="text-right text-white/20 text-xs">AI Generated — 임상가의 검토 및 수정 필요</div>
             </div>
           )}
@@ -246,7 +260,6 @@ export default function Module4({ params }: { params: Promise<{ id: string }> })
             <div className="space-y-6">
               {GRID_LAYOUT.map(layer => (
                 <div key={layer.layerKey}>
-                  {/* layer header */}
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-0.5 h-5 rounded-full" style={{ background: layer.layerColor }} />
                     <div>
@@ -254,13 +267,10 @@ export default function Module4({ params }: { params: Promise<{ id: string }> })
                       <span className="text-white/30 text-xs ml-2">{layer.layerDesc}</span>
                     </div>
                   </div>
-
-                  {/* 3-column grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {layer.cells.map(cell => {
                       const dim = interv.eemm_interventions?.[cell.key as keyof EemmInterventions] as DimIntervention | undefined;
                       const hasData = dim && (dim.techniques?.length || dim.expected_change || dim.rationale);
-
                       return (
                         <div key={cell.key} className="rounded-xl p-4 border flex flex-col gap-2"
                           style={{
@@ -268,29 +278,22 @@ export default function Module4({ params }: { params: Promise<{ id: string }> })
                             borderColor: hasData ? `${cell.color}30` : 'rgba(255,255,255,0.07)',
                             minHeight: 180,
                           }}>
-                          {/* cell header */}
                           <div className="flex items-center gap-2 mb-1">
                             <div className="w-2 h-2 rounded-full shrink-0" style={{ background: cell.color }} />
                             <span className="text-xs font-bold" style={{ color: cell.color }}>{cell.label}</span>
                           </div>
-
                           {!hasData ? (
                             <p className="text-white/20 text-xs">개입 없음</p>
                           ) : (
                             <>
-                              {/* techniques */}
                               {dim?.techniques && dim.techniques.length > 0 && (
                                 <div className="flex flex-wrap gap-1">
                                   {dim.techniques.map((t, i) => (
                                     <span key={i} className="px-1.5 py-0.5 rounded text-xs"
-                                      style={{ background: `${cell.color}20`, color: cell.color }}>
-                                      {t}
-                                    </span>
+                                      style={{ background: `${cell.color}20`, color: cell.color }}>{t}</span>
                                   ))}
                                 </div>
                               )}
-
-                              {/* target processes */}
                               {dim?.target_processes && dim.target_processes.length > 0 && (
                                 <div className="flex flex-wrap gap-1">
                                   {dim.target_processes.map((p, i) => (
@@ -298,15 +301,11 @@ export default function Module4({ params }: { params: Promise<{ id: string }> })
                                   ))}
                                 </div>
                               )}
-
-                              {/* expected change */}
                               {dim?.expected_change && (
                                 <div className="mt-auto pt-2 border-t border-white/5">
                                   <p className="text-white/40 text-xs leading-relaxed">{dim.expected_change}</p>
                                 </div>
                               )}
-
-                              {/* rationale */}
                               {dim?.rationale && (
                                 <p className="text-white/25 text-xs italic leading-relaxed">{dim.rationale}</p>
                               )}
@@ -318,14 +317,13 @@ export default function Module4({ params }: { params: Promise<{ id: string }> })
                   </div>
                 </div>
               ))}
-
               <div className="text-right text-white/20 text-xs">AI Generated — 임상가의 검토 및 수정 필요</div>
             </div>
           )}
 
           {/* ── TAB 3: 치료적 네트워크 ── */}
           {tab === 'network' && (
-            <div className="space-y-5">
+            <div>
               {!therapeuticNet ? (
                 <div className="text-center py-16 text-white/30">
                   <p className="text-4xl mb-3">🕸</p>
@@ -333,82 +331,195 @@ export default function Module4({ params }: { params: Promise<{ id: string }> })
                   <p className="text-xs mt-1">개입 전략을 재생성하면 포함됩니다</p>
                 </div>
               ) : (
-                <>
-                  {/* description */}
-                  {therapeuticNet.description && (
-                    <div className="rounded-xl p-4 border border-indigo-500/20" style={{ background: 'rgba(99,102,241,0.06)' }}>
-                      <p className="text-indigo-200/80 text-sm leading-relaxed">{therapeuticNet.description}</p>
-                    </div>
-                  )}
-
-                  {/* network visualization */}
-                  <TherapeuticNetwork eemmGrid={eemmGrid} therapeuticNetwork={therapeuticNet} />
-
-                  {/* change details */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* weakened edges */}
-                    {therapeuticNet.weakened_edges && therapeuticNet.weakened_edges.length > 0 && (
-                      <div className="rounded-xl p-4 border border-red-500/20" style={{ background: 'rgba(239,68,68,0.05)' }}>
-                        <h3 className="text-red-400 text-xs font-semibold mb-3 uppercase tracking-wider">약화될 연결</h3>
-                        <div className="space-y-2">
-                          {therapeuticNet.weakened_edges.map((e, i) => (
-                            <div key={i} className="text-xs text-white/60 leading-relaxed">
-                              <span className="text-white/80">{e.from_concept}</span>
-                              <span className="text-white/30 mx-1">→</span>
-                              <span className="text-white/80">{e.to_concept}</span>
-                              {e.reason && <p className="text-white/30 mt-0.5">{e.reason}</p>}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* new edges */}
-                    {therapeuticNet.new_edges && therapeuticNet.new_edges.length > 0 && (
-                      <div className="rounded-xl p-4 border border-green-500/20" style={{ background: 'rgba(74,222,128,0.05)' }}>
-                        <h3 className="text-green-400 text-xs font-semibold mb-3 uppercase tracking-wider">새로 형성될 연결</h3>
-                        <div className="space-y-2">
-                          {therapeuticNet.new_edges.map((e, i) => (
-                            <div key={i} className="text-xs text-white/60 leading-relaxed">
-                              <span className="text-white/80">{e.from_concept}</span>
-                              <span className="text-green-400/60 mx-1">→</span>
-                              <span className="text-white/80">{e.to_concept}</span>
-                              {e.reason && <p className="text-white/30 mt-0.5">{e.reason}</p>}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* strengthened nodes */}
-                    {therapeuticNet.strengthened_nodes && therapeuticNet.strengthened_nodes.length > 0 && (
-                      <div className="rounded-xl p-4 border border-emerald-500/20" style={{ background: 'rgba(52,211,153,0.05)' }}>
-                        <h3 className="text-emerald-400 text-xs font-semibold mb-3 uppercase tracking-wider">강화될 요인</h3>
-                        <div className="space-y-2">
-                          {therapeuticNet.strengthened_nodes.map((n, i) => (
-                            <div key={i} className="text-xs text-white/60 leading-relaxed">
-                              <span className="text-emerald-300/80">{n.concept}</span>
-                              <span className="ml-1.5 px-1 py-0.5 rounded text-xs" style={{ background: 'rgba(52,211,153,0.15)', color: '#6ee7b7' }}>
-                                {n.change_type === 'emerge' ? '신규' : '강화'}
+                <div className="flex gap-4">
+                  {/* ── 좌측: 차원 선택 패널 ── */}
+                  <div className="w-44 shrink-0 space-y-1.5">
+                    <p className="text-white/30 text-xs uppercase tracking-wider mb-3">차원 선택</p>
+                    {ALL_DIMS.map(dim => {
+                      const count = dimChangeCount(dim.key);
+                      const isSelected = selectedDim === dim.key;
+                      const dimInterv = interv.eemm_interventions?.[dim.key as keyof EemmInterventions] as DimIntervention | undefined;
+                      const firstTech = dimInterv?.techniques?.[0];
+                      return (
+                        <button key={dim.key}
+                          onClick={() => setSelectedDim(isSelected ? null : dim.key)}
+                          className="w-full text-left px-3 py-2.5 rounded-lg transition-all border"
+                          style={isSelected ? {
+                            background: `${dim.color}18`,
+                            borderColor: `${dim.color}50`,
+                          } : {
+                            background: 'rgba(255,255,255,0.02)',
+                            borderColor: 'rgba(255,255,255,0.06)',
+                          }}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full shrink-0" style={{ background: dim.color, opacity: isSelected ? 1 : 0.6 }} />
+                              <span className="text-xs font-semibold"
+                                style={{ color: isSelected ? dim.color : 'rgba(255,255,255,0.5)' }}>
+                                {dim.label}
                               </span>
-                              {n.change && <p className="text-white/30 mt-0.5">{n.change}</p>}
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                            {count > 0 && (
+                              <span className="text-xs rounded-full px-1.5 py-0.5 font-mono"
+                                style={{ background: isSelected ? `${dim.color}30` : 'rgba(255,255,255,0.06)', color: isSelected ? dim.color : 'rgba(255,255,255,0.3)' }}>
+                                {count}
+                              </span>
+                            )}
+                          </div>
+                          {firstTech && (
+                            <p className="text-xs mt-1 truncate" style={{ color: isSelected ? `${dim.color}99` : 'rgba(255,255,255,0.2)' }}>
+                              {firstTech}
+                            </p>
+                          )}
+                        </button>
+                      );
+                    })}
+                    <button onClick={() => setSelectedDim(null)}
+                      className="w-full text-center text-xs mt-2 py-1.5 rounded-lg transition-all"
+                      style={{ color: 'rgba(255,255,255,0.2)', background: selectedDim ? 'rgba(255,255,255,0.04)' : 'transparent' }}>
+                      전체 보기
+                    </button>
                   </div>
 
-                  {/* prognosis */}
-                  {therapeuticNet.overall_prognosis && (
-                    <div className="rounded-xl p-5 border border-white/10" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                      <h3 className="text-white/50 text-xs font-medium mb-2 uppercase tracking-wider">전반적 예후</h3>
-                      <p className="text-white/80 text-sm leading-relaxed">{therapeuticNet.overall_prognosis}</p>
-                    </div>
-                  )}
+                  {/* ── 우측: 네트워크 + 설명 ── */}
+                  <div className="flex-1 min-w-0 space-y-4">
+                    {/* 선택된 차원 설명 */}
+                    {selectedDim && (() => {
+                      const dim = ALL_DIMS.find(d => d.key === selectedDim);
+                      const dimInterv = interv.eemm_interventions?.[selectedDim as keyof EemmInterventions] as DimIntervention | undefined;
+                      const weakened = (therapeuticNet.weakened_edges ?? []).filter(e => e.dimension === selectedDim);
+                      const newE = (therapeuticNet.new_edges ?? []).filter(e => e.dimension === selectedDim);
+                      const strengthened = (therapeuticNet.strengthened_nodes ?? []).filter(n => n.dimension === selectedDim);
+                      return dim ? (
+                        <div className="rounded-xl p-4 border" style={{ background: `${dim.color}0a`, borderColor: `${dim.color}30` }}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="w-2.5 h-2.5 rounded-full" style={{ background: dim.color }} />
+                            <span className="text-sm font-bold" style={{ color: dim.color }}>{dim.label} 개입</span>
+                          </div>
+                          {dimInterv?.techniques && dimInterv.techniques.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {dimInterv.techniques.map((t, i) => (
+                                <span key={i} className="px-2 py-0.5 rounded text-xs"
+                                  style={{ background: `${dim.color}20`, color: dim.color }}>{t}</span>
+                              ))}
+                            </div>
+                          )}
+                          {dimInterv?.expected_change && (
+                            <p className="text-white/60 text-xs leading-relaxed mb-2">{dimInterv.expected_change}</p>
+                          )}
+                          {/* 변화 요약 */}
+                          <div className="flex flex-wrap gap-3 text-xs mt-2 pt-2 border-t border-white/5">
+                            {weakened.length > 0 && (
+                              <span className="text-red-400/70">약화 {weakened.length}개</span>
+                            )}
+                            {newE.length > 0 && (
+                              <span className="text-green-400/70">신규 연결 {newE.length}개</span>
+                            )}
+                            {strengthened.length > 0 && (
+                              <span className="text-emerald-400/70">강화 {strengthened.length}개</span>
+                            )}
+                          </div>
+                        </div>
+                      ) : null;
+                    })()}
 
-                  <div className="text-right text-white/20 text-xs">AI Generated — 임상가의 검토 및 수정 필요</div>
-                </>
+                    {/* 범례 */}
+                    <div className="flex flex-wrap gap-4 text-xs text-white/40 px-1">
+                      <span className="flex items-center gap-1.5">
+                        <svg width="24" height="8"><line x1="0" y1="4" x2="24" y2="4" stroke="#f87171" strokeWidth="2" /></svg>
+                        기존 유발
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <svg width="24" height="8"><line x1="0" y1="4" x2="24" y2="4" stroke="#ef4444" strokeWidth="2" strokeDasharray="5 3" /></svg>
+                        약화↓
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <svg width="24" height="8"><line x1="0" y1="4" x2="24" y2="4" stroke="#4ade80" strokeWidth="2.5" /></svg>
+                        보호↑
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <svg width="24" height="8"><line x1="0" y1="4" x2="24" y2="4" stroke="#38bdf8" strokeWidth="2" strokeDasharray="3 3" /></svg>
+                        새 상관↑
+                      </span>
+                    </div>
+
+                    {/* SVG 네트워크 */}
+                    <TherapeuticNetwork
+                      eemmGrid={eemmGrid}
+                      originalEdges={originalEdges}
+                      therapeuticNetwork={therapeuticNet}
+                      selectedDimension={selectedDim}
+                    />
+
+                    {/* 선택 차원의 변화 상세 목록 */}
+                    {selectedDim && (() => {
+                      const weakened = (therapeuticNet.weakened_edges ?? []).filter(e => e.dimension === selectedDim);
+                      const newE = (therapeuticNet.new_edges ?? []).filter(e => e.dimension === selectedDim);
+                      const strengthened = (therapeuticNet.strengthened_nodes ?? []).filter(n => n.dimension === selectedDim);
+                      if (!weakened.length && !newE.length && !strengthened.length) return null;
+                      return (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {weakened.length > 0 && (
+                            <div className="rounded-xl p-3 border border-red-500/20" style={{ background: 'rgba(239,68,68,0.05)' }}>
+                              <h4 className="text-red-400 text-xs font-semibold mb-2">약화될 연결</h4>
+                              <div className="space-y-1.5">
+                                {weakened.map((e, i) => (
+                                  <div key={i} className="text-xs">
+                                    <span className="text-white/70">{e.from_concept}</span>
+                                    <span className="text-white/30 mx-1">→</span>
+                                    <span className="text-white/70">{e.to_concept}</span>
+                                    {e.reason && <p className="text-white/30 mt-0.5 text-xs">{e.reason}</p>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {newE.length > 0 && (
+                            <div className="rounded-xl p-3 border border-green-500/20" style={{ background: 'rgba(74,222,128,0.05)' }}>
+                              <h4 className="text-green-400 text-xs font-semibold mb-2">새로 형성될 연결</h4>
+                              <div className="space-y-1.5">
+                                {newE.map((e, i) => (
+                                  <div key={i} className="text-xs">
+                                    <span className="text-white/70">{e.from_concept}</span>
+                                    <span className="text-green-400/60 mx-1">→</span>
+                                    <span className="text-white/70">{e.to_concept}</span>
+                                    {e.reason && <p className="text-white/30 mt-0.5 text-xs">{e.reason}</p>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {strengthened.length > 0 && (
+                            <div className="rounded-xl p-3 border border-emerald-500/20" style={{ background: 'rgba(52,211,153,0.05)' }}>
+                              <h4 className="text-emerald-400 text-xs font-semibold mb-2">강화될 요인</h4>
+                              <div className="space-y-1.5">
+                                {strengthened.map((n, i) => (
+                                  <div key={i} className="text-xs">
+                                    <span className="text-emerald-300/80">{n.concept}</span>
+                                    <span className="ml-1.5 px-1 rounded text-xs" style={{ background: 'rgba(52,211,153,0.15)', color: '#6ee7b7' }}>
+                                      {n.change_type === 'emerge' ? '신규' : '강화'}
+                                    </span>
+                                    {n.change && <p className="text-white/30 mt-0.5 text-xs">{n.change}</p>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* 전반적 예후 */}
+                    {therapeuticNet.overall_prognosis && (
+                      <div className="rounded-xl p-4 border border-white/10" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                        <h3 className="text-white/50 text-xs font-medium mb-2 uppercase tracking-wider">전반적 예후</h3>
+                        <p className="text-white/70 text-sm leading-relaxed">{therapeuticNet.overall_prognosis}</p>
+                      </div>
+                    )}
+
+                    <div className="text-right text-white/20 text-xs">AI Generated — 임상가의 검토 및 수정 필요</div>
+                  </div>
+                </div>
               )}
             </div>
           )}

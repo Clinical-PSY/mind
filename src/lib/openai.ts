@@ -358,17 +358,26 @@ socio_cultural → 대인관계 기술, 사회적 지지 강화, 가족 개입
   "_therapeutic_network": {
     "description": "개입 후 예상되는 전체 네트워크 변화 (2~3문장)",
     "weakened_edges": [
-      { "from": "셀키", "from_concept": "개념명", "to": "셀키", "to_concept": "개념명", "type": "causes", "reason": "약화 이유 (1문장)" }
+      { "from": "셀키", "from_concept": "개념명", "to": "셀키", "to_concept": "개념명", "type": "causes", "reason": "약화 이유 (1문장)", "dimension": "이변화를유발하는개입차원키" }
     ],
     "new_edges": [
-      { "from": "셀키", "from_concept": "개념명", "to": "셀키", "to_concept": "개념명", "type": "protects", "reason": "형성 이유 (1문장)" }
+      { "from": "셀키", "from_concept": "개념명", "to": "셀키", "to_concept": "개념명", "type": "protects", "reason": "형성 이유 (1문장)", "dimension": "이변화를유발하는개입차원키" }
     ],
     "strengthened_nodes": [
-      { "cell": "셀키", "concept": "강화될 개념명", "change_type": "improve", "change": "변화 내용 (1문장)" }
+      { "cell": "셀키", "concept": "강화될 개념명", "change_type": "improve", "change": "변화 내용 (1문장)", "dimension": "이변화를유발하는개입차원키" }
     ],
     "overall_prognosis": "전반적 예후 요약 (2~3문장)"
   }
-}`;
+}
+
+## dimension 필드 필수 규칙
+weakened_edges · new_edges · strengthened_nodes 모든 항목에 "dimension" 필드를 반드시 포함한다.
+dimension 값은 아래 9개 키 중 하나만 사용:
+  attention | cognition | self | emotion | behavior | motivation | bio_physiological | context | socio_cultural
+dimension 의미: 이 네트워크 변화를 주도하는 개입 차원.
+  예) 인지재구조화로 자동적사고→불안 연결 약화 → "dimension": "cognition"
+  예) 자기자비 훈련으로 자기비판 감소 → "dimension": "self"
+  예) 행동활성화로 회피→무기력 연결 약화 → "dimension": "behavior"`;
 
 export const SUPERVISION_SYSTEM = `당신은 20년 이상 경력의 임상심리 수퍼바이저이다. 상담사의 질문에 이론적 근거와 실무적 조언을 제공한다.
 
