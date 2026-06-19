@@ -407,14 +407,28 @@ export default function PrintPage({ params }: { params: Promise<{ id: string }> 
   const [data, setData] = useState<CaseData | null>(null);
 
   useEffect(() => {
-    // Force white background regardless of app theme
-    document.documentElement.style.background = '#ffffff';
-    document.body.style.background = '#ffffff';
-    document.body.style.color = '#111111';
+    // Override app theme: force white on html, body, and all direct-child wrappers
+    const origHtmlBg = document.documentElement.style.background;
+    const origBodyBg = document.body.style.background;
+    document.documentElement.style.setProperty('background', '#d6d6d6', 'important');
+    document.body.style.setProperty('background', 'transparent', 'important');
+    // Clear dark-mode classes that might be set by the layout
+    document.documentElement.classList.remove('dark');
+    document.body.classList.remove('dark');
+    // Force white on all layout wrapper divs (Next.js adds several)
+    const wrappers = document.body.querySelectorAll<HTMLElement>('div');
+    const cleared: { el: HTMLElement; bg: string }[] = [];
+    wrappers.forEach(el => {
+      const bg = el.style.background;
+      if (!el.classList.contains('print-page-area') && !el.classList.contains('print-page')) {
+        el.style.setProperty('background', 'transparent', 'important');
+        cleared.push({ el, bg });
+      }
+    });
     return () => {
-      document.documentElement.style.background = '';
-      document.body.style.background = '';
-      document.body.style.color = '';
+      document.documentElement.style.background = origHtmlBg;
+      document.body.style.background = origBodyBg;
+      cleared.forEach(({ el, bg }) => { el.style.background = bg; });
     };
   }, []);
 
@@ -441,28 +455,79 @@ export default function PrintPage({ params }: { params: Promise<{ id: string }> 
   return (
     <>
       <style>{`
-        @page { size: A4; margin: 18mm 20mm 20mm 22mm; }
+        @page { size: A4 portrait; margin: 18mm 20mm 20mm 22mm; }
+
         @media print {
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
           .no-print { display: none !important; }
           .page-break { page-break-before: always; break-before: page; }
           .avoid-break { page-break-inside: avoid; break-inside: avoid; }
+
+          /* Hide the outer page-area shell; only the A4 card content is printed */
+          html, body, body > *, body > * > *, body > * > * > * {
+            background: #ffffff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          .print-page-area {
+            background: transparent !important;
+            padding: 0 !important;
+          }
+          .print-page {
+            box-shadow: none !important;
+            border: none !important;
+            padding: 0 !important;
+            max-width: none !important;
+            margin: 0 !important;
+          }
         }
+
+        @media screen {
+          .print-page-area {
+            background: #d6d6d6;
+            min-height: 100vh;
+            padding: 32px 16px 64px;
+          }
+          .print-page {
+            max-width: 794px;
+            margin: 0 auto;
+            background: #ffffff;
+            box-shadow: 0 4px 32px rgba(0,0,0,0.22), 0 1px 4px rgba(0,0,0,0.10);
+            padding: 22mm 22mm 24mm 24mm;
+          }
+        }
+
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body {
-          background: #ffffff !important;
-          color: #111111;
+
+        /* Force transparent on all Next.js layout wrappers so only our containers show colour */
+        html, body,
+        #__next,
+        [data-nextjs-scroll-focus-boundary],
+        body > div, body > div > div,
+        body > div > div > div,
+        body > div > div > div > main,
+        body > div > div > div > main > div {
+          background: transparent !important;
+          background-color: transparent !important;
         }
+
+        html { background: #d6d6d6 !important; }
         body {
           font-family: 'Malgun Gothic', '맑은 고딕', 'Apple SD Gothic Neo', sans-serif;
-          font-size: 10pt; line-height: 1.75;
+          font-size: 10pt;
+          line-height: 1.75;
+          color: #111111;
         }
+        .print-page-area { background: #d6d6d6 !important; }
+        .print-page     { background: #ffffff !important; }
+
         table { border-collapse: collapse; }
         p { margin: 0; }
       `}</style>
 
-      {/* 인쇄 버튼 */}
-      <div className="no-print" style={{ position: 'fixed', top: 16, right: 16, zIndex: 100, display: 'flex', gap: 8 }}>
+      {/* 인쇄 버튼 — 화면에서만 표시 */}
+      <div className="no-print" style={{ maxWidth: 794, margin: '0 auto', padding: '0 0 14px', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
         <button onClick={() => window.print()}
           style={{ padding: '8px 18px', background: '#111', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
           🖨 인쇄 / PDF 저장
@@ -473,7 +538,8 @@ export default function PrintPage({ params }: { params: Promise<{ id: string }> 
         </button>
       </div>
 
-      <div style={{ maxWidth: 794, margin: '0 auto', padding: '32px 0', backgroundColor: '#ffffff', minHeight: '100vh' }}>
+      <div className="print-page-area">
+      <div className="print-page">
 
         {/* ── 레터헤드 ── */}
         <div style={{ borderTop: '3px solid #111', paddingTop: 12, paddingBottom: 12, borderBottom: '1px solid #888', marginBottom: 0 }}>
@@ -821,7 +887,8 @@ export default function PrintPage({ params }: { params: Promise<{ id: string }> 
           </div>
         </div>
 
-      </div>
+      </div>{/* /print-page */}
+      </div>{/* /print-page-area */}
     </>
   );
 }
