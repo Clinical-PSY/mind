@@ -6,6 +6,7 @@ import RorschachCoding from './RorschachCoding';
 import RiskAssessment from './RiskAssessment';
 import { IndexScoreChart, SubtestChart, classifyIndex } from './IntelChart';
 import SCTForm from './SCTForm';
+import { notifyUpdate } from '@/lib/case-sync';
 
 // ── 타입 ──────────────────────────────────────────────────────
 interface Session {
@@ -321,7 +322,7 @@ export default function Module1({ params }: { params: Promise<{ id: string }> })
         });
     if (res.ok) {
       localStorage.removeItem(`ml_draft_${id}`); setHasDraft(false);
-      await fetchData(); closeSessionModal();
+      await fetchData(); notifyUpdate(id); closeSessionModal();
     } else {
       const d = await res.json().catch(() => ({}));
       setError((d.detail || d.error) ?? (editingSessionId ? '수정 실패' : '저장 실패'));
@@ -414,7 +415,7 @@ export default function Module1({ params }: { params: Promise<{ id: string }> })
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...common, category: testCat, sub_type }),
         });
-    if (res.ok) { await fetchData(); closeTestModal(); }
+    if (res.ok) { await fetchData(); notifyUpdate(id); closeTestModal(); }
     else {
       const d = await res.json().catch(() => ({}));
       setError((d.detail || d.error) ?? (editingTestId ? '수정 실패' : '저장 실패'));

@@ -3,6 +3,8 @@ import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { fetchWithAuth } from '@/lib/fetch-with-auth';
+import { computeStaleness, type CaseBundle } from '@/lib/staleness';
+import { listenForUpdates } from '@/lib/case-sync';
 
 interface Case {
   id: string; client_alias: string; age: number; gender: string;
@@ -37,6 +39,7 @@ export default function CaseHub({ params }: { params: Promise<{ id: string }> })
   const { id } = use(params);
   const router  = useRouter();
   const [caseData,   setCaseData]   = useState<Case | null>(null);
+  const [bundle,     setBundle]     = useState<CaseBundle>({});
   const [loading,    setLoading]    = useState(true);
   const [showEdit,   setShowEdit]   = useState(false);
   const [saving,     setSaving]     = useState(false);
@@ -47,16 +50,21 @@ export default function CaseHub({ params }: { params: Promise<{ id: string }> })
   const [statusEdit, setStatusEdit] = useState(false);
   const [newStatus,  setNewStatus]  = useState('');
 
+  async function loadCase() {
+    const res = await fetchWithAuth(`/api/mindlink/cases/${id}`);
+    if (!res.ok) { router.replace('/mindlink'); return; }
+    const data = await res.json();
+    setCaseData(data);
+    setBundle({ sessions: data.sessions, tests: data.tests, psych_report: data.psych_report, conceptualization: data.conceptualization, intervention: data.intervention, outcomes: data.outcomes });
+    setNewStatus(data.status);
+    setLoading(false);
+  }
+
   useEffect(() => {
-    (async () => {
-      const res = await fetchWithAuth(`/api/mindlink/cases/${id}`);
-      if (!res.ok) { router.replace('/mindlink'); return; }
-      const data = await res.json();
-      setCaseData(data);
-      setNewStatus(data.status);
-      setLoading(false);
-    })();
-  }, [id, router]);
+    loadCase();
+    const cleanup = listenForUpdates(id, loadCase);
+    return cleanup;
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function updateStatus() {
     await fetchWithAuth(`/api/mindlink/cases/${id}`, {
@@ -207,39 +215,66 @@ export default function CaseHub({ params }: { params: Promise<{ id: string }> })
       </div>
 
       {/* Module grid */}
-      <p className="text-xs font-semibold uppercase tracking-widest mb-3"
-        style={{ color: 'rgba(255,255,255,0.25)' }}>모듈</p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {modules.map(m => (
-          <Link key={m.num} href={`/mindlink/cases/${id}/module${m.num}`}>
-            <div className="rounded-2xl p-5 border cursor-pointer group h-full transition-all"
-              style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.07)' }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.06)';
-                (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.14)';
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.03)';
-                (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.07)';
-              }}>
-              <div className="flex items-start justify-between mb-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-                  style={{ background: m.color + '18' }}>
-                  {m.icon}
-                </div>
-                <span className="text-xs font-mono transition-colors"
-                  style={{ color: 'rgba(255,255,255,0.18)' }}>0{m.num}</span>
-              </div>
-              <h3 className="text-sm font-semibold text-white mb-1">{m.title}</h3>
-              <p className="text-xs leading-relaxed" style={{ color: 'rgba(255,255,255,0.38)' }}>{m.desc}</p>
-              <div className="mt-3 flex items-center gap-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                style={{ color: m.color }}>
-                <span>열기</span><span>→</span>
-              </div>
+      {(() => {
+        const stale = computeStaleness(bundle);
+        const staleMap: Record<number, boolean> = { 2: stale.m2, 3: stale.m3, 4: stale.m4, 6: stale.m6 };
+        return (
+          <>
+            <p className="text-xs font-semibold uppercase tracking-widest mb-3"
+              style={{ color: 'rgba(255,255,255,0.25)' }}>모듈</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {modules.map(m => {
+                const isStale = staleMap[m.num] ?? false;
+                return (
+                  <Link key={m.num} href={`/mindlink/cases/${id}/module${m.num}`}>
+                    <div className="rounded-2xl p-5 border cursor-pointer group h-full transition-all relative"
+                      style={{
+                        background: 'rgba(255,255,255,0.03)',
+                        borderColor: isStale ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.07)',
+                      }}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.06)';
+                        (e.currentTarget as HTMLDivElement).style.borderColor = isStale ? 'rgba(245,158,11,0.5)' : 'rgba(255,255,255,0.14)';
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.03)';
+                        (e.currentTarget as HTMLDivElement).style.borderColor = isStale ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.07)';
+                      }}>
+                      {/* staleness dot */}
+                      {isStale && (
+                        <span className="absolute top-3 right-3 flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                            style={{ background: '#fbbf24' }} />
+                          <span className="relative inline-flex rounded-full h-2 w-2"
+                            style={{ background: '#f59e0b' }} />
+                        </span>
+                      )}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+                          style={{ background: m.color + '18' }}>
+                          {m.icon}
+                        </div>
+                        <span className="text-xs font-mono transition-colors"
+                          style={{ color: 'rgba(255,255,255,0.18)' }}>0{m.num}</span>
+                      </div>
+                      <h3 className="text-sm font-semibold text-white mb-1">{m.title}</h3>
+                      <p className="text-xs leading-relaxed" style={{ color: 'rgba(255,255,255,0.38)' }}>{m.desc}</p>
+                      {isStale ? (
+                        <p className="mt-2 text-xs" style={{ color: '#fbbf24' }}>업데이트 필요</p>
+                      ) : (
+                        <div className="mt-3 flex items-center gap-1 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                          style={{ color: m.color }}>
+                          <span>열기</span><span>→</span>
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
-          </Link>
-        ))}
-      </div>
+          </>
+        );
+      })()}
 
       {/* Edit modal */}
       {showEdit && (

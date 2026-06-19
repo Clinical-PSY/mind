@@ -1,8 +1,11 @@
 'use client';
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, use, useRef } from 'react';
 import Link from 'next/link';
 import { fetchWithAuth } from '@/lib/fetch-with-auth';
 import EEMMNetwork from './EEMMNetwork';
+import { computeStaleness, type CaseBundle } from '@/lib/staleness';
+import { notifyUpdate, listenForUpdates } from '@/lib/case-sync';
+import StalenessBanner from '@/components/mindlink/StalenessBanner';
 
 // ── 타입 ────────────────────────────────────────────────────────────
 interface GridCell {
@@ -87,34 +90,42 @@ const EDGE_META = {
 export default function Module3({ params }: { params: Promise<{ id: string }> }) {
   const { id }     = use(params);
   const [concept,    setConcept]    = useState<Concept | null>(null);
+  const [bundle,     setBundle]     = useState<CaseBundle>({});
   const [loading,    setLoading]    = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error,      setError]      = useState('');
   const [activeTab,  setActiveTab]  = useState<'structured' | 'grid' | 'network'>('structured');
+  const generateRef = useRef<HTMLButtonElement>(null);
+
+  async function loadData() {
+    const res = await fetchWithAuth(`/api/mindlink/cases/${id}`);
+    if (!res.ok) return;
+    const d = await res.json();
+    if (d.conceptualization) {
+      const raw = d.conceptualization;
+      const eg  = raw.eemm_grid ?? {};
+      setConcept({
+        ...raw,
+        referral_background:  raw.referral_background  ?? eg.referral_background,
+        test_results_summary: raw.test_results_summary ?? eg.test_results_summary,
+        strengths:            raw.strengths            ?? eg.strengths,
+        vulnerabilities:      raw.vulnerabilities      ?? eg.vulnerabilities,
+        counseling_goals:     raw.counseling_goals     ?? eg.counseling_goals,
+        counseling_strategy:  raw.counseling_strategy  ?? eg.counseling_strategy,
+        network_edges:        raw.network_edges        ?? eg.network_edges,
+      });
+    }
+    setBundle({ sessions: d.sessions, tests: d.tests, psych_report: d.psych_report,
+      conceptualization: d.conceptualization, intervention: d.intervention, outcomes: d.outcomes });
+    setLoading(false);
+  }
 
   useEffect(() => {
-    (async () => {
-      const res = await fetchWithAuth(`/api/mindlink/cases/${id}`);
-      if (res.ok) {
-        const d = await res.json();
-        if (d.conceptualization) {
-          const raw = d.conceptualization;
-          const eg  = raw.eemm_grid ?? {};
-          setConcept({
-            ...raw,
-            referral_background:  raw.referral_background  ?? eg.referral_background,
-            test_results_summary: raw.test_results_summary ?? eg.test_results_summary,
-            strengths:            raw.strengths            ?? eg.strengths,
-            vulnerabilities:      raw.vulnerabilities      ?? eg.vulnerabilities,
-            counseling_goals:     raw.counseling_goals     ?? eg.counseling_goals,
-            counseling_strategy:  raw.counseling_strategy  ?? eg.counseling_strategy,
-            network_edges:        raw.network_edges        ?? eg.network_edges,
-          });
-        }
-      }
-      setLoading(false);
-    })();
-  }, [id]);
+    loadData();
+    const cleanup = listenForUpdates(id, loadData);
+    const timer = setInterval(loadData, 60_000);
+    return () => { cleanup(); clearInterval(timer); };
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function generate() {
     setGenerating(true); setError('');
@@ -123,10 +134,15 @@ export default function Module3({ params }: { params: Promise<{ id: string }> })
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ case_id: id }),
     });
-    if (res.ok) { const d = await res.json(); setConcept(d.conceptualization); }
-    else        { const d = await res.json(); setError(d.error ?? 'AI 오류'); }
+    if (res.ok) {
+      const d = await res.json(); setConcept(d.conceptualization);
+      notifyUpdate(id);
+      await loadData();
+    } else { const d = await res.json(); setError(d.error ?? 'AI 오류'); }
     setGenerating(false);
   }
+
+  const staleness = computeStaleness(bundle);
 
   const TABS = [
     { key: 'structured', label: '사례개념화' },
@@ -154,7 +170,7 @@ export default function Module3({ params }: { params: Promise<{ id: string }> })
             Hayes &amp; Hofmann (2018) 확장진화메타모델 — 9차원 심리 네트워크
           </p>
         </div>
-        <button onClick={generate} disabled={generating}
+        <button ref={generateRef} onClick={generate} disabled={generating}
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-medium disabled:opacity-60 transition-opacity hover:opacity-90"
           style={{ background: 'linear-gradient(135deg, #06b6d4, #6366f1)' }}>
           {generating
@@ -162,6 +178,13 @@ export default function Module3({ params }: { params: Promise<{ id: string }> })
             : <span>{concept ? '재생성' : 'AI 개념화 생성'}</span>}
         </button>
       </div>
+
+      {staleness.m3 && (
+        <StalenessBanner
+          sources={staleness.m3Sources}
+          onRegenerate={() => { generateRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); generate(); }}
+        />
+      )}
 
       {error && (
         <div className="rounded-xl p-4 mb-4 text-sm" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5' }}>

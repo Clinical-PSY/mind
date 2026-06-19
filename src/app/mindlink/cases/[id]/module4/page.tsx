@@ -1,8 +1,11 @@
 'use client';
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, use, useRef } from 'react';
 import Link from 'next/link';
 import { fetchWithAuth } from '@/lib/fetch-with-auth';
 import TherapeuticNetwork, { type OriginalEdge, type TherapeuticNetworkData } from './TherapeuticNetwork';
+import { computeStaleness, type CaseBundle } from '@/lib/staleness';
+import { notifyUpdate, listenForUpdates } from '@/lib/case-sync';
+import StalenessBanner from '@/components/mindlink/StalenessBanner';
 
 // ── 타입 ────────────────────────────────────────────────────────────
 interface DimIntervention {
@@ -80,6 +83,7 @@ type TabKey = 'overview' | 'grid' | 'network';
 export default function Module4({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [interv, setInterv] = useState<Intervention | null>(null);
+  const [bundle, setBundle] = useState<CaseBundle>({});
   const [eemmGrid, setEemmGrid] = useState<Record<string, { key_concepts?: string[]; maladaptive_pattern?: string }>>({});
   const [originalEdges, setOriginalEdges] = useState<OriginalEdge[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,19 +91,26 @@ export default function Module4({ params }: { params: Promise<{ id: string }> })
   const [error, setError] = useState('');
   const [tab, setTab] = useState<TabKey>('overview');
   const [selectedDim, setSelectedDim] = useState<string | null>(null);
+  const generateRef = useRef<HTMLButtonElement>(null);
+
+  async function loadData() {
+    const res = await fetchWithAuth(`/api/mindlink/cases/${id}`);
+    if (!res.ok) return;
+    const d = await res.json();
+    if (d.intervention) setInterv(d.intervention);
+    if (d.conceptualization?.eemm_grid) setEemmGrid(d.conceptualization.eemm_grid);
+    if (d.conceptualization?.network_edges) setOriginalEdges(d.conceptualization.network_edges);
+    setBundle({ sessions: d.sessions, tests: d.tests, psych_report: d.psych_report,
+      conceptualization: d.conceptualization, intervention: d.intervention, outcomes: d.outcomes });
+    setLoading(false);
+  }
 
   useEffect(() => {
-    (async () => {
-      const res = await fetchWithAuth(`/api/mindlink/cases/${id}`);
-      if (res.ok) {
-        const d = await res.json();
-        if (d.intervention) setInterv(d.intervention);
-        if (d.conceptualization?.eemm_grid) setEemmGrid(d.conceptualization.eemm_grid);
-        if (d.conceptualization?.network_edges) setOriginalEdges(d.conceptualization.network_edges);
-      }
-      setLoading(false);
-    })();
-  }, [id]);
+    loadData();
+    const cleanup = listenForUpdates(id, loadData);
+    const timer = setInterval(loadData, 60_000);
+    return () => { cleanup(); clearInterval(timer); };
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function generate() {
     setGenerating(true); setError('');
@@ -107,10 +118,15 @@ export default function Module4({ params }: { params: Promise<{ id: string }> })
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ case_id: id }),
     });
-    if (res.ok) { const d = await res.json(); setInterv(d.intervention); }
-    else { const d = await res.json(); setError(d.error ?? 'AI 오류'); }
+    if (res.ok) {
+      const d = await res.json(); setInterv(d.intervention);
+      notifyUpdate(id);
+      await loadData();
+    } else { const d = await res.json(); setError(d.error ?? 'AI 오류'); }
     setGenerating(false);
   }
+
+  const staleness = computeStaleness(bundle);
 
   const therapeuticNet = interv?.eemm_interventions?._therapeutic_network;
 
@@ -146,7 +162,7 @@ export default function Module4({ params }: { params: Promise<{ id: string }> })
           <h1 className="text-xl font-bold text-white">개입 전략 설계</h1>
           <p className="text-white/40 text-xs mt-1">EEMM 9차원 개입 + 치료적 네트워크 예측 — 사례개념화 완료 후 생성 가능</p>
         </div>
-        <button onClick={generate} disabled={generating}
+        <button ref={generateRef} onClick={generate} disabled={generating}
           className="px-4 py-2 rounded-lg text-white text-sm font-medium flex items-center gap-2 disabled:opacity-60"
           style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444)' }}>
           {generating
@@ -154,6 +170,13 @@ export default function Module4({ params }: { params: Promise<{ id: string }> })
             : <span>{interv ? '재생성' : 'AI 계획 생성'}</span>}
         </button>
       </div>
+
+      {staleness.m4 && (
+        <StalenessBanner
+          sources={staleness.m4Sources}
+          onRegenerate={() => { generateRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); generate(); }}
+        />
+      )}
 
       {error && <div className="rounded-xl p-4 mb-4 border border-red-500/30 bg-red-500/10 text-red-300 text-sm">{error}</div>}
 
